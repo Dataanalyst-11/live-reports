@@ -1,17 +1,14 @@
-// inject.js — replaces placeholders in index.html with env var values at build time
 const fs = require("fs");
 
 const file = process.argv[2] || "index.html";
 let html = fs.readFileSync(file, "utf8");
 
-// JSON.stringify safely escapes quotes; the </script> guard is cheap insurance
 const safe = (v) => JSON.stringify(v ?? "").replace(/</g, "\\u003c");
 
 html = html.replace('"__API_URL__"', safe(process.env.API_URL));
-html = html.replace('"__API_TOKEN__"', safe(process.env.API_TOKEN));
 
-if (html.includes("__API_URL__") || html.includes("__API_TOKEN__")) {
-  console.error("::error::Injection failed — placeholders remain. Check that secrets API_URL and API_TOKEN exist.");
+if (html.includes("__API_URL__")) {
+  console.error("::error::Injection failed — placeholder remains. Check that secret API_URL exists.");
   process.exit(1);
 }
 
