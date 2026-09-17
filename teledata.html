@@ -1027,11 +1027,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  // These placeholders are replaced with real values by GitHub Actions at deploy time.
-  // Do NOT fill them in and commit — that would leak your credentials.
+  // Not a credential — proxy only accepts requests from this site's origin.
+  // The real API token lives ONLY in the Cloudflare worker's secrets.
   window.API_CONFIG = {
-    API_URL: "__API_URL__",
-    API_TOKEN: "__API_TOKEN__"
+    API_URL: "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/"
   };
 </script>
 <script>
