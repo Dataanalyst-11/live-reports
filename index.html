@@ -1035,7 +1035,7 @@
     API_TOKEN: "__API_TOKEN__"
   };
 </script>
-<script src="config.local.js"></script>
+
 
 
 
@@ -1046,7 +1046,7 @@
 
   const AUTO_REFRESH_MS = 600000; // 10 minutes
   const DATA_LOOKBACK_DAYS = 365;
-  const API_TOKEN = window.API_CONFIG.API_TOKEN;
+
 
   let currentSort = { key: "score", dir: "desc" };
   let currentView = "telesales";
@@ -1487,7 +1487,6 @@
     const json = await fetchWithRetry(url, {
       signal,
       headers: {
-        "Authorization": API_TOKEN,
         "Content-Type": "application/json"
       }
     });
@@ -1509,7 +1508,6 @@
     const json = await fetchWithRetry(url, {
       signal,
       headers: {
-        "Authorization": API_TOKEN,
         "Content-Type": "application/json"
       }
     });
