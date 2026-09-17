@@ -24,7 +24,6 @@ jobs:
       - name: Inject secrets into index.html
         env:
           API_URL: ${{ secrets.API_URL }}
-          API_TOKEN: ${{ secrets.API_TOKEN }}
         run: node inject.js index.html
 
       - name: Setup Pages
