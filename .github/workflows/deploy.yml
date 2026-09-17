@@ -21,13 +21,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inject secrets into index.html
-        env:
-          API_URL: ${{ secrets.API_URL }}
-        run: node inject.js index.html
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
