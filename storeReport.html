@@ -527,7 +527,7 @@ function applyF() {
 
 async function fetchAllData(params) {
     const u = burl(params);
-    const resp = await fetch(u, { headers: {  'Content-Type': 'application/json' } });
+    const resp = await fetch(u);  // No headers needed for simple GET
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const j = await resp.json();
     return Array.isArray(j) ? j : (j.data || []);
