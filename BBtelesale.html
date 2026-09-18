@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Beibora Telesales Performance Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    /* DARK BACKGROUND */
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER (KEEPS GREEN) ─────────────────────────────────── */
+  header {
+    background: linear-gradient(135deg, #006400 0%, #006400 100%);
+    border-bottom: 3px solid #006400;
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    color: #ffffff;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  }
+
+  .header-left { display: flex; align-items: center; gap: 20px; }
+
+  .header-logo {
+    width: 44px; height: 44px;
+    background: #ffffff;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 20px;
+    color: #0d9488; flex-shrink: 0;
+  }
+
+  .header-title { font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px; }
+  .header-subtitle { font-size: 12px; color: #ccfbf1; font-weight: 400; margin-top: 2px; }
+
+  .header-right { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; position: relative; }
+
+  .header-loading-overlay {
+    position: absolute; inset: 0;
+    background: rgba(13, 148, 136, 0.6);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .header-loading-overlay.active { opacity: 1; pointer-events: all; }
+  .header-loading-overlay .mini-spinner {
+    width: 22px; height: 22px;
+    border: 3px solid #5eead4; border-top-color: #ffffff;
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+
+  /* ── Shared Select Style ────────────────────────────────── */
+  .filter-select { position: relative; }
+  .filter-select select {
+    padding: 12px 42px 12px 16px;
+    border-radius: 10px;
+    border: 2px solid #99f6e4;
+    background: #ffffff;
+    color: #0f766e;
+    font-size: 20px; font-weight: 600;
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+    outline: none;
+  }
+  .filter-select select:disabled { opacity: 0.5; cursor: not-allowed; }
+  .filter-select select:hover:not(:disabled) { border-color: #0d9488; }
+  .filter-select select:focus:not(:disabled) {
+    border-color: #0d9488;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
+  }
+  .filter-select::after {
+    content: "\25BE"; position: absolute;
+    right: 16px; top: 50%; transform: translateY(-50%);
+    color: #0d9488; font-size: 18px; pointer-events: none;
+  }
+  .date-selector select { min-width: 160px; }
+  .branch-selector select { min-width: 240px; }
+
+  /* ── Custom Date Range Picker ───────────────────────────── */
+  .custom-date-range {
+    display: flex; align-items: center; gap: 0;
+    border-radius: 10px;
+    border: 2px solid #99f6e4;
+    background: #ffffff;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.3s, max-width 0.4s ease, padding 0.4s ease;
+    max-width: 0; opacity: 0; padding: 0;
+    border-color: transparent; pointer-events: none;
+  }
+  .custom-date-range.visible {
+    max-width: 380px; opacity: 1; padding: 0;
+    border-color: #99f6e4; pointer-events: all;
+  }
+  .custom-date-range.disabled { opacity: 0.4; pointer-events: none; }
+  .custom-date-range:focus-within:not(.disabled) {
+    border-color: #0d9488;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
+  }
+
+  .date-range-group { display: flex; align-items: center; gap: 0; padding: 4px 10px; position: relative; }
+  .date-range-group + .date-range-group { border-left: 1px solid #ccfbf1; }
+  .date-range-label {
+    font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: #0d9488; margin-right: 8px;
+    white-space: nowrap; user-select: none;
+  }
+  .date-range-input-wrap { position: relative; display: flex; align-items: center; }
+  .date-range-input-wrap input[type="date"] {
+    padding: 8px 10px 8px 30px;
+    border-radius: 7px;
+    border: 1.5px solid #ccfbf1;
+    background: #f0fdfa;
+    color: #0f766e;
+    font-size: 13px; font-weight: 600;
+    outline: none; width: 130px;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    transition: border-color 0.2s;
+  }
+  .date-range-input-wrap input[type="date"]:disabled { opacity: 0.4; cursor: not-allowed; }
+  .date-range-input-wrap input[type="date"]:hover:not(:disabled) { border-color: #5eead4; }
+  .date-range-input-wrap input[type="date"]:focus:not(:disabled) { border-color: #0d9488; }
+  .date-range-input-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7) sepia(1) saturate(3) hue-rotate(120deg);
+    cursor: pointer; opacity: 0.7; transition: opacity 0.2s;
+  }
+  .date-range-input-wrap input[type="date"]:disabled::-webkit-calendar-picker-indicator { cursor: not-allowed; }
+  .date-range-input-wrap input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+  .date-icon {
+    position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px; pointer-events: none; opacity: 0.5;
+  }
+  .date-icon svg { width: 100%; height: 100%; fill: #0d9488; }
+
+  /* ── View Containers ─────────────────────────────────────── */
+  #telesalesView { flex: 1; display: flex; flex-direction: column; }
+
+  /* ── Stat Cards ─────────────────────────────────────────── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    padding: 24px 32px 0;
+  }
+
+  .stat-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    padding: 22px 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  }
+  .stat-card:hover {
+    border-color: #0d9488;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(13, 148, 136, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  }
+  .stat-card::before {
+    content: ""; position: absolute;
+    top: 0; left: 0; width: 4px; height: 100%;
+    border-radius: 4px 0 0 4px;
+  }
+  .stat-card:nth-child(1)::before { background: #16a34a; }
+  .stat-card:nth-child(2)::before { background: #0284c7; }
+  .stat-card:nth-child(3)::before { background: #dc2626; }
+
+  .stat-label {
+    font-size: 12px; text-transform: uppercase;
+    letter-spacing: 1.2px; color: #5eead4;
+    font-weight: 600; margin-bottom: 10px;
+  }
+  .stat-value { font-size: 26px; font-weight: 800; color: #f1f5f9; line-height: 1; }
+  .stat-sub { font-size: 13px; color: #94a3b8; margin-top: 6px; font-weight: 400; }
+
+  .perf-high { color: #4ade80 !important; }
+  .perf-medium { color: #facc15 !important; }
+  .perf-low { color: #f87171 !important; }
+
+  /* ── Telesales: Branch Perf Bar ──────────────────────────── */
+  .branch-perf-section { padding: 20px 32px 0; }
+
+  .branch-perf-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    padding: 24px 28px;
+    display: flex; align-items: center; gap: 28px;
+    flex-wrap: wrap;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  }
+
+  .branch-perf-info { flex: 0 0 auto; min-width: 240px; }
+  .branch-perf-info .label {
+    font-size: 12px; text-transform: uppercase;
+    letter-spacing: 1.2px; color: #5eead4;
+    font-weight: 600; margin-bottom: 6px;
+  }
+  .branch-perf-info .value { font-size: 42px; font-weight: 900; line-height: 1; color: #f1f5f9; }
+  .branch-perf-info .detail { font-size: 13px; color: #cbd5e1; margin-top: 8px; line-height: 1.7; }
+  .branch-perf-info .detail .deficit { font-weight: 700; color: #f87171; }
+  .branch-perf-info .detail .surplus { font-weight: 700; color: #4ade80; }
+
+  .perf-bar-wrap { flex: 1; min-width: 200px; }
+  .perf-bar-track {
+    width: 100%; height: 20px;
+    background: #0f172a;
+    border-radius: 99px;
+    overflow: hidden;
+    border: 1px solid #334155;
+  }
+  .perf-bar-fill {
+    height: 100%; border-radius: 99px;
+    transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s;
+    min-width: 0;
+  }
+  .perf-bar-labels {
+    position: relative; height: 16px; margin-top: 6px;
+    font-size: 11px; color: #94a3b8; font-weight: 600;
+  }
+  .perf-bar-labels span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .perf-bar-labels span.lbl-0 { left: 0%; transform: none; }
+  .perf-bar-labels span.lbl-50 { left: 50%; }
+  .perf-bar-labels span.lbl-80 { left: 80%; }
+  .perf-bar-labels span.lbl-100 { left: 100%; transform: translateX(-100%); }
+  .perf-bar-labels span.active-marker { color: #5eead4; }
+
+  /* ── Telesales: Table ───────────────────────────────────── */
+  .table-section {
+    flex: 1; padding: 20px 32px 24px;
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
+  .table-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+  }
+  .table-title { font-size: 16px; font-weight: 700; color: #f1f5f9; }
+  .table-count {
+    font-size: 13px; color: #5eead4;
+    background: rgba(13, 148, 136, 0.15);
+    border: 1px solid rgba(13, 148, 136, 0.3);
+    padding: 5px 20px; border-radius: 99px; font-weight: 600;
+  }
+
+  .search-box {
+    padding: 9px 16px 9px 38px;
+    border-radius: 10px;
+    border: 2px solid #334155;
+    background: #1e293b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%235eead4' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397,1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E") 20px center no-repeat;
+    color: #f1f5f9;
+    font-size: 20px; width: 260px; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-box::placeholder { color: #64748b; }
+  .search-box:focus { border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.25); }
+
+  .table-wrap {
+    flex: 1; overflow-y: auto;
+    border-radius: 20px;
+    border: 1px solid #334155;
+    background: #1e293b;
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  }
+  .table-wrap::-webkit-scrollbar { width: 6px; }
+  .table-wrap::-webkit-scrollbar-track { background: transparent; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
+
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 20px; }
+
+  thead th {
+    position: sticky; top: 0;
+    background: #0f172a;
+    color: #5eead4;
+    text-transform: uppercase;
+    font-size: 11px; letter-spacing: 1px;
+    font-weight: 700; z-index: 2;
+    padding: 20px 20px;
+    border-bottom: 2px solid #0d9488;
+    text-align: left; user-select: none; white-space: nowrap;
+  }
+  thead th.sortable { cursor: pointer; transition: color 0.2s, background 0.2s; }
+  thead th.sortable:hover { color: #f1f5f9; background: #1e293b; }
+  thead th.sortable.active-sort { color: #10b981; }
+
+  .sort-icon {
+    display: inline-block; margin-left: 5px;
+    font-size: 9px; opacity: 0.35;
+    vertical-align: middle;
+    transition: opacity 0.2s, transform 0.25s;
+  }
+  thead th.sortable:hover .sort-icon { opacity: 0.7; }
+  thead th.sortable.active-sort .sort-icon { opacity: 1; }
+  thead th.sortable.active-sort.sort-asc .sort-icon { transform: rotate(0deg); }
+  thead th.sortable.active-sort.sort-desc .sort-icon { transform: rotate(180deg); }
+
+ th:nth-child(1), td:nth-child(1) { width: 46px; text-align: center; }
+ th:nth-child(2), td:nth-child(2) { width: 17%; }
+ th:nth-child(3), td:nth-child(3) { width: 12%; }
+ th:nth-child(4), td:nth-child(4) { width: 11%; text-align: center; }
+ th:nth-child(5), td:nth-child(5) { width: 9%; text-align: center; }
+ th:nth-child(6), td:nth-child(6) { width: 14%; text-align: right; }
+ th:nth-child(7), td:nth-child(7) { width: 14%; text-align: right; }
+ th:nth-child(8), td:nth-child(8) { width: 13%; text-align: center; }
+
+  td { padding: 13px 20px; border-bottom: 1px solid #334155; vertical-align: middle; color: #cbd5e1; }
+  tbody tr { transition: background 0.15s; }
+  tbody tr:hover { background: #334155; }
+
+  .rank { color: #94a3b8; font-weight: 700; font-size: 13px; }
+  .rank.top3 { color: #10b981; font-size: 15px; }
+  .sales-name { font-weight: 700; color: #f1f5f9; font-size: 13px; }
+  .branch-cell { font-size: 12px; color: #5eead4; }
+
+  .pct-badge {
+    display: inline-block; padding: 4px 10px;
+    border-radius: 99px; font-weight: 800; font-size: 12px;
+    min-width: 62px; text-align: center;
+  }
+  .pct-high { background: rgba(22, 163, 74, 0.2); color: #4ade80; }
+  .pct-medium { background: rgba(202, 138, 4, 0.2); color: #facc15; }
+  .pct-low { background: rgba(220, 38, 38, 0.2); color: #f87171; }
+
+  .orders-cell { font-weight: 700; color: #e2e8f0; font-size: 13px; }
+
+  .value-cell {
+    font-weight: 700; color: #e2e8f0; font-size: 13px;
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .value-cell .kes { font-weight: 400; color: #94a3b8; font-size: 11px; margin-right: 2px; }
+
+  .status-dot {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  .deficit-cell {
+  font-weight: 700;
+  color: #e2e8f0;
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.deficit-cell .deficit-val { color: #ef4444; }
+.deficit-cell .surplus-val { color: #22c55e; }
+
+  .status-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .status-on-track::before { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .status-on-track { color: #4ade80; }
+  .status-at-risk::before { background: #facc15; box-shadow: 0 0 6px #facc15; }
+  .status-at-risk { color: #facc15; }
+  .status-below::before { background: #f87171; box-shadow: 0 0 6px #f87171; }
+  .status-below { color: #f87171; }
+
+  .no-data-row td { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 15px; }
+  .loading-row td { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 15px; }
+
+  .loading-spinner {
+    display: inline-block; width: 20px; height: 20px;
+    border: 3px solid #334155; border-top-color: #10b981;
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 10px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sort-hint { font-size: 11px; color: #94a3b8; font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+  .days-worked-info {
+    font-size: 10px; color: #64748b;
+    margin-top: 4px; font-weight: 500;
+    line-height: 1.2; white-space: nowrap;
+  }
+
+  /* ── Footer / Toast ─────────────────────────────────────── */
+  footer {
+    text-align: center; padding: 20px;
+    font-size: 12px;
+    background: #1e293b;
+    color: #94a3b8;
+    border-top: 1px solid #334155;
+  }
+  footer span.highlight { color: #10b981; font-weight: 600; }
+
+  .toast {
+    position: fixed; bottom: 30px; right: 30px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-left: 4px solid #f87171;
+    color: #f1f5f9;
+    padding: 16px 24px; border-radius: 12px;
+    font-size: 20px; font-weight: 600;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.4), 0 4px 6px -2px rgba(0,0,0,0.3);
+    z-index: 999;
+    transform: translateX(120%);
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    max-width: 380px;
+  }
+  .toast.show { transform: translateX(0); }
+  .toast.toast-warn { border-left-color: #facc15; }
+  .toast.toast-retry { border-left-color: #0284c7; }
+
+  /* ── Responsive ──────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    th:nth-child(7), td:nth-child(7) { display: none; }
+    th:nth-child(3), td:nth-child(3) { display: none; }
+    th:nth-child(2), td:nth-child(2) { width: 30%; }
+    th:nth-child(4), td:nth-child(4) { width: 16%; }
+    th:nth-child(5), td:nth-child(5) { width: 14%; }
+    th:nth-child(6), td:nth-child(6) { width: 22%; text-align: center; }
+    .value-cell { text-align: center; }
+  }
+
+  @media (max-width: 600px) {
+    header { padding: 20px 18px; }
+    .stats-row { grid-template-columns: 1fr; padding: 16px 18px 0; gap: 12px; }
+    .branch-perf-section { padding: 16px 18px 0; }
+    .table-section { padding: 16px 18px 18px; }
+    .stat-value { font-size: 20px; }
+    .branch-perf-info .value { font-size: 32px; }
+    .branch-perf-info { min-width: 100%; }
+    .header-right { width: 100%; }
+    .filter-select { flex: 1; min-width: 0; }
+    .filter-select select { width: 100%; }
+    .search-box { width: 100%; }
+    th:nth-child(6), td:nth-child(6) { display: none; }
+    th:nth-child(2), td:nth-child(2) { width: 40%; }
+    th:nth-child(4), td:nth-child(4) { width: 22%; }
+    th:nth-child(5), td:nth-child(5) { width: 20%; }
+    .custom-date-range.visible { max-width: 100%; flex-direction: column; border-radius: 10px; }
+    .date-range-group + .date-range-group { border-left: none; border-top: 1px solid #ccfbf1; }
+    .date-range-input-wrap input[type="date"] { width: 100%; }
+  }
+  
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-logo">BT</div>
+    <div>
+      <div class="header-title" id="headerTitle">Beibora Telesales Performance Dashboard</div>
+      <div class="header-subtitle" id="headerSubtitle">Management Overview — Real-time Sales Tracking</div>
+    </div>
+  </div>
+  <div class="header-right" id="headerRight">
+    <div class="header-loading-overlay" id="headerLoading">
+      <div class="mini-spinner"></div>
+    </div>
+    <div class="filter-select date-selector">
+      <select id="dateSelect">
+        <option value="today" selected>Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="7days">Last 7 Days</option>
+        <option value="30days">Last 30 Days</option>
+        <option value="90days">Last 90 Days</option>
+        <option value="custom">Custom Range</option>
+      </select>
+    </div>
+    <div class="custom-date-range" id="customDateRange">
+      <div class="date-range-group">
+        <span class="date-range-label">From</span>
+        <div class="date-range-input-wrap">
+          <span class="date-icon">
+            <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+          </span>
+          <input type="date" id="dateFrom">
+        </div>
+      </div>
+      <div class="date-range-group">
+        <span class="date-range-label">To</span>
+        <div class="date-range-input-wrap">
+          <span class="date-icon">
+            <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+          </span>
+          <input type="date" id="dateTo">
+        </div>
+      </div>
+    </div>
+    <div class="filter-select branch-selector" id="branchSelectorWrap">
+      <select id="branchSelect">
+        <option value="">All Branches</option>
+      </select>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════ TELESALES VIEW ═══════════════ -->
+<div id="telesalesView">
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Customer Orders</div>
+      <div class="stat-value" id="statOrders">—</div>
+      <div class="stat-sub" id="statOrdersSub">across all telesales</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Telesales</div>
+      <div class="stat-value" id="statActive">—</div>
+      <div class="stat-sub" id="statActiveSub">with recorded sales</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label" id="deficitLabel">Sales Deficit</div>
+      <div class="stat-value" id="statDeficit">—</div>
+      <div class="stat-sub" id="statDeficitSub">vs branch target</div>
+    </div>
+  </div>
+
+  <div class="branch-perf-section">
+    <div class="branch-perf-card">
+      <div class="branch-perf-info">
+        <div class="label">Branch Performance</div>
+        <div class="value" id="branchPerfValue">—</div>
+        <div class="detail" id="branchPerfDetail">loading...</div>
+      </div>
+      <div class="perf-bar-wrap">
+        <div class="perf-bar-track">
+          <div class="perf-bar-fill" id="branchPerfBar" style="width:0%;"></div>
+        </div>
+        <div class="perf-bar-labels">
+          <span class="lbl-0">0%</span>
+          <span id="marker50" class="lbl-50">50%</span>
+          <span class="lbl-80">80%</span>
+          <span class="lbl-100">100%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-section">
+    <div class="table-header">
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+        <span class="table-title">Telesales Ranking</span>
+        <span class="table-count" id="tableCount">0 people</span>
+        <span class="sort-hint" id="sortHint">Click column headers to sort</span>
+      </div>
+      <input type="text" class="search-box" id="searchBox" placeholder="Search by name or branch...">
+    </div>
+    <div class="table-wrap" id="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th class="sortable" data-sort="name">Telesale Name <span class="sort-icon">▲</span></th>
+            <th class="sortable" data-sort="branch">Branch <span class="sort-icon">▲</span></th>
+            <th class="sortable active-sort sort-desc" data-sort="score" style="text-align:center;">Sales % <span class="sort-icon">▲</span></th>
+            <th class="sortable" data-sort="orders" style="text-align:center;">Orders <span class="sort-icon">▲</span></th>
+            <th class="sortable" data-sort="value" style="text-align:right;">Order Value <span class="sort-icon">▲</span></th>
+            <th class="sortable" data-sort="deficit" style="text-align:right;">Sales Deficit <span class="sort-icon">▲</span></th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr class="loading-row">
+            <td colspan="8">
+              <span class="loading-spinner"></span>
+              Loading sales data...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Last updated: <span class="highlight" id="lastUpdated">—</span> &nbsp;|&nbsp;
+  Auto-refreshes every 10 mins &nbsp;|&nbsp;
+  Designed and Managed by <span class="highlight">MIS.DPT</span>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<!-- Replace the beibora.js configuration file -->
+<script>
+  // Not a credential — proxy only accepts requests from this site's origin.
+  // The real API token lives ONLY in the Cloudflare worker's secrets.
+  window.API_CONFIG = {
+    API_URL: "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/beibora/"
+  };
+</script>
+
+<script>
+  /* ============================================================
+     DATA ENGINE
+     ============================================================ */
+
+  const AUTO_REFRESH_MS = 600000; // 10 minutes
+  const DATA_LOOKBACK_DAYS = 365; // One API pull covers the client-side date filters.
+  
+
+  let currentSort = { key: "score", dir: "desc" };
+  let isLoading = false;
+  let currentAbortCtrl = null;
+
+  let allRawData = [];
+  let filteredData = [];
+  let displayedData = [];
+  let lastDataFetchAt = null;
+  let currentDaysInRange = 0;
+
+  /* ── Hardcoded Daily Branch Targets ────────────────────────── 
+     If a branch is not listed here, it falls back to summing the 
+     salespeople's targets from the API. Targets are DAILY amounts.
+  ──────────────────────────────────────────────────────────── */
+  const BRANCH_DAILY_TARGETS = {
+    "Bei Bora Thika": 1200000,
+    "Bei Bora Githurai": 1731000,
+    "Bei Bora Kitengela": 1500000,
+    "Bei Bora Head Office": 3200000,
+    "Bei Bora Rongai": 800000,
+    "Bei Bora Shoppers": 1153846
+    
+  };
+
+  /* ── Date helpers ────────────────────────────────────────── */
+
+  function formatDate(d) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function parseDateKey(value) {
+    if (!value) return null;
+    const s = String(value);
+    const match = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+  }
+
+  function getRecordDate(record) {
+    return parseDateKey(
+      record.reportingDate ||
+      record.reportDate ||
+      record.salesDate ||
+      record.date ||
+      record.createdAt ||
+      record.updatedAt
+    );
+  }
+
+  function getToday() {
+    return new Date();
+  }
+
+  function getFetchRange() {
+    const end = getToday();
+    const start = new Date(end);
+    start.setDate(start.getDate() - DATA_LOOKBACK_DAYS + 1);
+
+    return {
+      startDate: formatDate(start),
+      endDate: formatDate(end)
+    };
+  }
+
+  function getDateRange() {
+    const preset = document.getElementById("dateSelect").value;
+    const today = getToday();
+    const endDate = formatDate(today);
+
+    if (preset === "custom") {
+      let startDate = document.getElementById("dateFrom").value || endDate;
+      let customEnd = document.getElementById("dateTo").value || endDate;
+
+      if (startDate > customEnd) {
+        [startDate, customEnd] = [customEnd, startDate];
+      }
+
+      return { startDate, endDate: customEnd };
+    }
+
+    if (preset === "yesterday") {
+      const d = new Date(today);
+      d.setDate(d.getDate() - 1);
+      const day = formatDate(d);
+      return { startDate: day, endDate: day };
+    }
+
+    const daysMap = {
+      today: 1,
+      "7days": 7,
+      "30days": 30,
+      "90days": 90
+    };
+
+    const days = daysMap[preset] || 1;
+    const start = new Date(today);
+    start.setDate(start.getDate() - days + 1);
+
+    return {
+      startDate: formatDate(start),
+      endDate
+    };
+  }
+
+  function syncDateInputsFromPreset(preset) {
+    const today = getToday();
+    const todayStr = formatDate(today);
+    let fromStr = todayStr;
+    let toStr = todayStr;
+
+    switch (preset) {
+      case "today":
+        break;
+
+      case "yesterday": {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        fromStr = toStr = formatDate(y);
+        break;
+      }
+
+      case "7days": {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 6);
+        fromStr = formatDate(d);
+        break;
+      }
+
+      case "30days": {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 29);
+        fromStr = formatDate(d);
+        break;
+      }
+
+      case "90days": {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 89);
+        fromStr = formatDate(d);
+        break;
+      }
+
+      case "custom":
+        return;
+    }
+
+    document.getElementById("dateFrom").value = fromStr;
+    document.getElementById("dateTo").value = toStr;
+  }
+
+  function toggleCustomDateRange(show) {
+    document.getElementById("customDateRange").classList.toggle("visible", show);
+  }
+
+  function isDateInRange(dateKey, startDate, endDate) {
+    return !!dateKey && dateKey >= startDate && dateKey <= endDate;
+  }
+
+  // FIX: Automatically skips Saturdays (Day 6) from the total calendar days count
+  function getDaysInRange(startDate, endDate) {
+    if (!startDate || !endDate) return 0;
+    
+    let count = 0;
+    let currentDate = new Date(startDate + "T00:00:00");
+    const end = new Date(endDate + "T00:00:00");
+    
+    while (currentDate <= end) {
+      // 0 = Sunday, 6 = Saturday
+      if (currentDate.getDay() !== 6) {
+        count++;
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return count;
+  }
+
+  /* ── Branch names & IDs ────────────────────────────────────── */
+
+  const branchNames = {
+    "orgbranch-6a74b425a74cd8c01f57e287": "Bei Bora Head Office",
+    "orgbranch-6a74b353a74cd8c01f57e046": "Bei Bora Githurai",
+    "orgbranch-6a74b35fa74cd8c01f57e0c7": "Bei Bora Kitengela",
+    "orgbranch-6a74b34da74cd8c01f57e006": "Bei Bora Thika",
+    "orgbranch-6a74b358a74cd8c01f57e086": "Bei Bora Rongai",
+    "orgbranch-6aa000f3374af26d46f95a9a" : "Bei Bora Shoppers"
+     
+  };
+
+  const branchSelect = document.getElementById("branchSelect");
+
+  Object.entries(branchNames)
+    .sort((a, b) => a[1].localeCompare(b[1]))
+    .forEach(([id, name]) => {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = name;
+      branchSelect.appendChild(opt);
+    });
+
+  /* ── Formatting ──────────────────────────────────────────── */
+
+  function formatValue(num) {
+    const n = Number(num) || 0;
+    if (n >= 1000000) return (n / 1000000).toFixed(2) + "M";
+    if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+    return Math.round(n).toLocaleString();
+  }
+
+  function formatCurrency(num) {
+    const n = Number(num) || 0;
+    if (n >= 1000000) return (n / 1000000).toFixed(2) + "M";
+    if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+    return Math.round(n).toLocaleString();
+  }
+
+  function formatFullCurrency(num) {
+    return "KES " + Math.round(Number(num) || 0).toLocaleString();
+  }
+
+  function toNumber(value) {
+    if (value === null || value === undefined || value === "") return 0;
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+    const cleaned = String(value)
+      .replace(/,/g, "")
+      .replace(/%/g, "")
+      .trim();
+
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function getSalesTarget(row) {
+    return toNumber(
+      row.dailySalesTarget ??
+      row.salesTarget ??
+      row.target ??
+      row.dailyTarget ??
+      row.targetSales
+    );
+  }
+
+  function getNetSales(row) {
+    return toNumber(
+      row.netDailySales ??
+      row.netSales ??
+      row.dailyNetSales ??
+      row.branchNetSales
+    );
+  }
+
+  function getCustomerOrders(row) {
+    return toNumber(
+      row.totalDaysCustomers ??
+      row.dailyCustomers ??
+      row.customerOrders ??
+      row.totalCustomers
+    );
+  }
+
+  function getSalesDeficit(row) {
+  return toNumber(
+    row.dailySalesDeficit ??
+    row.salesDeficit ??
+    row.deficit
+  );
+}
+
+  function getBranchNameFromSalesRow(row) {
+    return String(
+      row.branchName ||
+      row.orgBranchName ||
+      branchNames[row.orgBranchId] ||
+      ""
+    ).trim();
+  }
+
+  function getBranchIdFromRow(row) {
+    return row.orgBranchId || row.branchId || "";
+  }
+
+  function getBranchIdByName(name) {
+    const normalized = String(name || "").trim().toLowerCase();
+
+    for (const [id, branchName] of Object.entries(branchNames)) {
+      if (branchName.toLowerCase() === normalized) return id;
+    }
+
+    return "";
+  }
+
+  /* ── Toast ───────────────────────────────────────────────── */
+
+  let toastTimer = null;
+
+  function showToast(msg, type) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.className = "toast" + (type ? " toast-" + type : "");
+    void t.offsetWidth;
+    t.classList.add("show");
+
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 4500);
+  }
+
+  /* ── Abort / retry ───────────────────────────────────────── */
+
+  function abortPreviousRequests() {
+    if (currentAbortCtrl) {
+      currentAbortCtrl.abort();
+      currentAbortCtrl = null;
+    }
+
+    currentAbortCtrl = new AbortController();
+    return currentAbortCtrl.signal;
+  }
+
+  async function fetchWithRetry(url, options, maxRetries = 3) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, options);
+
+        if (response.status === 409 && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+          showToast(
+            `Rate limited — retrying in ${Math.round(delay / 1000)}s...`,
+            "retry"
+          );
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+
+        return await response.json();
+
+      } catch (err) {
+        if (err.name === "AbortError") throw err;
+
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 700 + Math.random() * 300;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        throw err;
+      }
+    }
+  }
+
+  /* ── SINGLE API REQUEST ────────────────────────────── */
+
+  async function fetchSalesData(signal) {
+    const { startDate, endDate } = getFetchRange();
+
+    const url =
+      `${window.BEIBORA_CONFIG.API_URL}sales-person/performance-reports` +
+      `?pageSize=10000` +
+      `&startDate=${encodeURIComponent(startDate)}` +
+      `&endDate=${encodeURIComponent(endDate)}`;
+
+    console.log("[API] Sales:", url);
+
+    const json = await fetchWithRetry(url, {
+      signal,
+      headers: {
+        
+        "Content-Type": "application/json"
+      }
+    });
+
+    return Array.isArray(json) ? json : (json.data || []);
+  }
+
+  /* ── Loading state ───────────────────────────────────────── */
+
+  function setLoadingState(loading) {
+    isLoading = loading;
+
+    const overlay = document.getElementById("headerLoading");
+    const dateSelect = document.getElementById("dateSelect");
+    const dateFrom = document.getElementById("dateFrom");
+    const dateTo = document.getElementById("dateTo");
+    const branchSel = document.getElementById("branchSelect");
+
+    if (loading) {
+      overlay.classList.add("active");
+      dateSelect.disabled = true;
+      dateFrom.disabled = true;
+      dateTo.disabled = true;
+      branchSel.disabled = true;
+    } else {
+      overlay.classList.remove("active");
+      dateSelect.disabled = false;
+      dateFrom.disabled = false;
+      dateTo.disabled = false;
+      branchSel.disabled = false;
+    }
+  }
+
+  function showTableLoading() {
+    document.getElementById("tableBody").innerHTML = `
+      <tr class="loading-row">
+        <td colspan="8">
+          <span class="loading-spinner"></span>
+          Loading sales data...
+        </td>
+      </tr>`;
+  }
+
+  /* ── Client-side range aggregation ───────────────────────── */
+
+  // Aggregates Individual Telesales. 
+  // FIX: Excludes any row where netDailySales is <= 0.
+  function aggregateSalesPeople(startDate, endDate, selectedBranchId) {
+    // ── Step 1: Aggregate per (salesperson + branch + date) to get daily totals ──
+    const dailyMap = new Map();
+
+    for (const row of allRawData) {
+      const rowDate = getRecordDate(row);
+      if (!isDateInRange(rowDate, startDate, endDate)) continue;
+
+      const branchId = getBranchIdFromRow(row);
+      const branchName = getBranchNameFromSalesRow(row);
+
+      if (selectedBranchId) {
+        const selectedName = branchNames[selectedBranchId] || "";
+        if (
+          branchId &&
+          branchId !== selectedBranchId &&
+          branchName.toLowerCase() !== selectedName.toLowerCase()
+        ) {
+          continue;
+        }
+
+        if (
+          !branchId &&
+          branchName.toLowerCase() !== selectedName.toLowerCase()
+        ) {
+          continue;
+        }
+      }
+
+      const name = String(
+        row.salesPersonName ||
+        row.salespersonName ||
+        row.salesPerson ||
+        row.name ||
+        ""
+      ).trim();
+
+      if (!name) continue;
+
+      // Strictly exclude values <= 0 from being added to the net sales
+      const rowNetSales = getNetSales(row);
+      if (rowNetSales <= 0) continue; // <-- Skips this row entirely if sales are 0 or negative
+
+      const dailyKey = `${name.toLowerCase()}||${branchName.toLowerCase()}||${rowDate}`;
+
+      if (!dailyMap.has(dailyKey)) {
+        dailyMap.set(dailyKey, {
+          salesPersonName: name,
+          branchName,
+          orgBranchId: branchId || getBranchIdByName(branchName),
+          date: rowDate,
+          netValue: 0,
+          target: 0,
+          orders: 0,
+          deficit: 0
+        });
+      }
+
+      const d = dailyMap.get(dailyKey);
+      
+      // Summing only positive raw daily values for this specific day
+      d.netValue += rowNetSales;             // Sums row.netDailySales
+      d.target   += getSalesTarget(row);     // Sums row.dailySalesTarget
+      d.orders   += getCustomerOrders(row);
+      d.deficit  += getSalesDeficit(row);
+    }
+
+    // ── Step 2: Roll daily totals up to per-salesperson totals ──
+    // Only days where the rep had POSITIVE sales (>0) count toward performance.
+    const personMap = new Map();
+
+    for (const d of dailyMap.values()) {
+      // Safety check: ensure the daily aggregated net value is still > 0
+      if (d.netValue <= 0) continue;
+
+      const personKey = `${d.salesPersonName.toLowerCase()}||${d.branchName.toLowerCase()}`;
+
+      if (!personMap.has(personKey)) {
+        personMap.set(personKey, {
+          salesPersonName: d.salesPersonName,
+          branchName: d.branchName,
+          orgBranchId: d.orgBranchId,
+          netValue: 0,
+          target: 0,
+          orders: 0,
+          deficit: 0,
+          daysWorked: 0
+        });
+      }
+
+      const p = personMap.get(personKey);
+
+      // Add the strictly positive daily values to the person's total
+      p.netValue   += d.netValue;
+      p.orders     += d.orders;
+      p.target     += d.target;
+      p.deficit    += d.deficit;
+      p.daysWorked += 1;
+    }
+
+    // ── Step 3: Compute score from raw summations and filter ──
+    return [...personMap.values()]
+      .map(g => ({
+        salesPersonName: g.salesPersonName,
+        branchName: g.branchName,
+        orgBranchId: g.orgBranchId,
+        netValue: g.netValue,             // Total netDailySales (strictly > 0 only)
+        target: g.target,                 // Total dailySalesTarget (only for positive days)
+        orders: g.orders,
+        deficit: g.deficit,
+        days: g.daysWorked,               // Count of days where netDailySales > 0
+        // Calculate percentage directly from the sums
+        score: g.target > 0 ? (g.netValue / g.target) * 100 : 0,
+        totalDaysCustomers: g.orders
+      }))
+      .filter(g => g.score > 0); // Keeps only reps who actually achieved > 0%
+  }
+
+  /* ── Calculate Branch Performance automatically ──────────── */
+  function calculateBranchPerformance(startDate, endDate, selectedBranchId) {
+    const daysInRange = getDaysInRange(startDate, endDate);
+    const branchMap = new Map();
+
+    for (const row of allRawData) {
+      const rowDate = getRecordDate(row);
+      if (!isDateInRange(rowDate, startDate, endDate)) continue;
+
+      const branchId = getBranchIdFromRow(row);
+      const branchName = getBranchNameFromSalesRow(row);
+
+      if (selectedBranchId) {
+        const selectedName = branchNames[selectedBranchId] || "";
+        if (branchId && branchId !== selectedBranchId && branchName.toLowerCase() !== selectedName.toLowerCase()) continue;
+        if (!branchId && branchName.toLowerCase() !== selectedName.toLowerCase()) continue;
+      }
+
+      if (!branchName) continue;
+
+      const rowNetSales = getNetSales(row);
+      if (rowNetSales <= 0) continue;
+
+      if (!branchMap.has(branchName)) {
+        branchMap.set(branchName, {
+          name: branchName,
+          netSales: 0,
+          repTargetSum: 0
+        });
+      }
+
+      const b = branchMap.get(branchName);
+      b.netSales += rowNetSales;
+      b.repTargetSum += getSalesTarget(row); // Fallback if not hardcoded
+    }
+
+    let totalNetSales = 0;
+    let totalTarget = 0;
+
+    for (const b of branchMap.values()) {
+      // Use hardcoded target * days in range, OR fallback to rep targets sum
+      const dailyTarget = BRANCH_DAILY_TARGETS[b.name] || 0;
+      const rangeTarget = dailyTarget > 0 ? dailyTarget * daysInRange : b.repTargetSum;
+      
+      totalNetSales += b.netSales;
+      totalTarget += rangeTarget;
+    }
+
+    return {
+      netSales: totalNetSales,
+      target: totalTarget,
+      pct: totalTarget > 0 ? (totalNetSales / totalTarget) * 100 : 0
+    };
+  }
+
+  /* ── Main refresh ───────────────────────────── */
+
+  async function loadAllData() {
+    if (isLoading) return;
+
+    const signal = abortPreviousRequests();
+    setLoadingState(true);
+    showTableLoading();
+
+    try {
+      const salesData = await fetchSalesData(signal);
+
+      if (signal.aborted) return;
+
+      allRawData = salesData;
+      lastDataFetchAt = new Date();
+
+      console.log(
+        `%c[DATA CACHE] Sales rows: ${allRawData.length}`,
+        "color:#0d9488;font-weight:bold"
+      );
+
+      processAndRender();
+
+      document.getElementById("lastUpdated").textContent =
+        lastDataFetchAt.toLocaleTimeString();
+
+    } catch (err) {
+      if (err.name === "AbortError") {
+        console.log("[Request Aborted]");
+        return;
+      }
+
+      console.error(err);
+      showToast("Failed to load data: " + err.message, "warn");
+
+      document.getElementById("tableBody").innerHTML =
+        `<tr class="no-data-row">
+          <td colspan="8">Failed to load data. Please try again.</td>
+        </tr>`;
+
+    } finally {
+      if (!signal.aborted) {
+        setLoadingState(false);
+      }
+    }
+  }
+
+  /* ── Telesales processing ───────────────────────────────── */
+
+  function processAndRender() {
+    const { startDate, endDate } = getDateRange();
+    currentDaysInRange = getDaysInRange(startDate, endDate);
+    const selectedBranch = branchSelect.value;
+    const selectedBranchName = selectedBranch
+      ? (branchNames[selectedBranch] || "")
+      : "";
+
+    const processed = aggregateSalesPeople(
+      startDate,
+      endDate,
+      selectedBranch
+    );
+
+    processed.sort((a, b) => b.score - a.score);
+
+    const totalOrders = processed.reduce(
+      (s, r) => s + Number(r.totalDaysCustomers || 0),
+      0
+    );
+
+    const activeCount = processed.length;
+
+    // Calculate Branch Performance
+    const branchPerf = calculateBranchPerformance(startDate, endDate, selectedBranch);
+    const branchTarget = branchPerf.target;
+    const branchNetSales = branchPerf.netSales;
+    const branchPerfPct = branchPerf.pct;
+
+    const deficit = branchTarget - branchNetSales;
+    const eightyPctTarget = branchTarget * 0.8;
+    const deficitBelow80 = eightyPctTarget - branchNetSales;
+
+    document.getElementById("statOrders").textContent =
+      totalOrders.toLocaleString();
+
+    document.getElementById("statOrdersSub").textContent =
+      selectedBranch
+        ? `from ${selectedBranchName}`
+        : "across all branches";
+
+    document.getElementById("statActive").textContent = activeCount;
+
+    document.getElementById("statActiveSub").textContent =
+      selectedBranch
+        ? `in ${selectedBranchName}`
+        : "across all branches";
+
+    const deficitEl = document.getElementById("statDeficit");
+    const deficitLabelEl = document.getElementById("deficitLabel");
+    const deficitSubEl = document.getElementById("statDeficitSub");
+
+    if (deficitBelow80 > 0) {
+      deficitLabelEl.textContent = "Deficit Below 80%";
+      deficitEl.className = "stat-value perf-low";
+      deficitEl.textContent =
+        "KES " + formatCurrency(deficitBelow80);
+      deficitSubEl.textContent =
+        `to reach ${formatFullCurrency(eightyPctTarget)} (80% target)`;
+    } else {
+      deficitLabelEl.textContent = "Above 80% Target";
+      deficitEl.className = "stat-value perf-high";
+      deficitEl.textContent =
+        "KES " + formatCurrency(Math.abs(deficitBelow80));
+      deficitSubEl.textContent = "minimum threshold met";
+    }
+
+    const perfClass =
+      branchPerfPct >= 80 ? "perf-high" :
+      branchPerfPct >= 50 ? "perf-medium" :
+      "perf-low";
+
+    const perfEl = document.getElementById("branchPerfValue");
+    perfEl.textContent = branchPerfPct.toFixed(1) + "%";
+    perfEl.className = "value " + perfClass;
+
+    let detailHTML =
+      `${formatFullCurrency(branchNetSales)} of ` +
+      `${formatFullCurrency(branchTarget)} target<br>`;
+
+    if (deficit > 0) {
+      detailHTML +=
+        `Deficit: <span class="deficit">` +
+        `${formatFullCurrency(deficit)}</span>`;
+    } else if (deficit < 0) {
+      detailHTML +=
+        `Surplus: <span class="surplus">` +
+        `${formatFullCurrency(Math.abs(deficit))}</span>`;
+    } else {
+      detailHTML += `<span class="surplus">Target met exactly</span>`;
+    }
+
+    document.getElementById("branchPerfDetail").innerHTML = detailHTML;
+
+    const bar = document.getElementById("branchPerfBar");
+    const barPct = Math.min(branchPerfPct, 100);
+
+    bar.style.width = barPct + "%";
+    bar.style.background =
+      branchPerfPct >= 80
+        ? "linear-gradient(90deg, #16a34a, #22c55e)"
+        : branchPerfPct >= 50
+          ? "linear-gradient(90deg, #ca8a04, #facc15)"
+          : "linear-gradient(90deg, #dc2626, #ef4444)";
+
+    document.getElementById("marker50").classList.toggle("active-marker", branchPerfPct < 50);
+
+    filteredData = processed;
+    applySearchAndSort();
+  }
+
+  /* ── Telesales sorting ───────────────────────────────────── */
+
+  function getSortValue(item, key) {
+    switch (key) {
+      case "name":
+        return (item.salesPersonName || "").toLowerCase();
+      case "branch":
+        return (item.branchName || "").toLowerCase();
+      case "score":
+        return item.score;
+      case "orders":
+      return Number(item.totalDaysCustomers || 0);
+    case "value":
+      return item.netValue;
+    case "deficit":
+      return Number(item.deficit || 0);
+    default:
+      return 0;
+    }
+  }
+
+  function sortData(data) {
+    const { key, dir } = currentSort;
+    const sorted = [...data];
+
+    sorted.sort((a, b) => {
+      const va = getSortValue(a, key);
+      const vb = getSortValue(b, key);
+
+      if (typeof va === "string") {
+        const cmp = va.localeCompare(vb);
+        return dir === "asc" ? cmp : -cmp;
+      }
+
+      return dir === "asc" ? va - vb : vb - va;
+    });
+
+    return sorted;
+  }
+
+  function applySearchAndSort() {
+    const q = document.getElementById("searchBox").value
+      .toLowerCase()
+      .trim();
+
+    let data = filteredData;
+
+    if (q) {
+      data = data.filter(d =>
+        (d.salesPersonName || "").toLowerCase().includes(q) ||
+        (d.branchName || "").toLowerCase().includes(q)
+      );
+    }
+
+    displayedData = sortData(data);
+    renderTable(displayedData);
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById("tableBody");
+
+    document.getElementById("tableCount").textContent =
+      data.length + (data.length === 1 ? " person" : " people");
+
+    if (!data.length) {
+      tbody.innerHTML =
+        `<tr class="no-data-row">
+          <td colspan="8">No telesales data found for the selected range</td>
+        </tr>`;
+      return;
+    }
+
+    let html = "";
+    const showDaysInfo = currentDaysInRange > 1;
+
+    data.forEach((item, i) => {
+      const sales = Number(item.score) || 0;
+      const orders = Number(item.totalDaysCustomers || 0);
+      const value = Number(item.netValue) || 0;
+      const deficit = Number(item.deficit || 0);
+      const daysWorked = Number(item.days) || 0;
+
+      const pctClass =
+        sales >= 80 ? "pct-high" :
+        sales >= 50 ? "pct-medium" :
+        "pct-low";
+
+      const statusClass =
+        sales >= 80 ? "status-on-track" :
+        sales >= 50 ? "status-at-risk" :
+        "status-below";
+
+      const statusText =
+        sales >= 80 ? "ACHIEVED" :
+        sales >= 50 ? "AVERAGE" :
+        "OFF TRACK";
+
+      const rankClass = i < 3 ? "rank top3" : "rank";
+
+       let deficitHTML;
+     if (deficit > 0) {
+      deficitHTML = `<span class="kes">KES</span> <span class="deficit-val">${formatValue(deficit)}</span>`;
+     } else if (deficit < 0) {
+      deficitHTML = `<span class="kes">KES</span> <span class="surplus-val">${formatValue(Math.abs(deficit))}</span>`;
+     } else {
+     deficitHTML = `<span class="surplus-val" style="color:#22c55e;">On Target</span>`;
+     }
+
+      html += `
+        <tr>
+          <td class="${rankClass}">${i + 1}</td>
+          <td class="sales-name">${item.salesPersonName}</td>
+          <td class="branch-cell">${item.branchName}</td>
+          <td style="text-align:center;">
+            <span class="pct-badge ${pctClass}">
+              ${sales.toFixed(1)}%
+            </span>
+            ${showDaysInfo ? `<div class="days-worked-info">on ${daysWorked} of ${currentDaysInRange} days</div>` : ''}
+          </td>
+          <td class="orders-cell" style="text-align:center;">
+            ${orders.toLocaleString()}
+          </td>
+       <td class="value-cell">
+        <span class="kes">KES</span> ${formatValue(value)}
+      </td>
+        <td class="deficit-cell">
+        ${deficitHTML}
+      </td>
+          <td style="text-align:center;">
+            <span class="status-dot ${statusClass}">
+              ${statusText}
+            </span>
+          </td>
+        </tr>
+      `;
+    });
+
+    tbody.innerHTML = html;
+  }
+
+  /* ── Sort headers ────────────────────────────────────────── */
+
+  const sortLabels = {
+    name: "Name",
+    branch: "Branch",
+    score: "Sales %",
+    orders: "Orders",
+    value: "Order Value",
+   deficit: "Sales Deficit"
+  };
+
+  function updateSortHeaders() {
+    document.querySelectorAll("thead th.sortable").forEach(th => {
+      const key = th.dataset.sort;
+
+      th.classList.remove(
+        "active-sort",
+        "sort-asc",
+        "sort-desc"
+      );
+
+      if (key === currentSort.key) {
+        th.classList.add(
+          "active-sort",
+          currentSort.dir === "asc" ? "sort-asc" : "sort-desc"
+        );
+      }
+    });
+
+    const hint = document.getElementById("sortHint");
+    const arrow = currentSort.dir === "asc" ? "↑" : "↓";
+    hint.textContent =
+      `Sorted by ${sortLabels[currentSort.key]} ${arrow}`;
+  }
+
+  document.querySelectorAll("thead th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sort;
+
+      if (currentSort.key === key) {
+        currentSort.dir =
+          currentSort.dir === "desc" ? "asc" : "desc";
+      } else {
+        currentSort.key = key;
+        currentSort.dir =
+          (key === "score" ||
+          key === "orders" ||
+          key === "value" ||
+          key === "deficit")
+            ? "desc"
+            : "asc";
+      }
+
+      updateSortHeaders();
+      applySearchAndSort();
+    });
+  });
+
+  /* ── FILTER HANDLERS ─────────────────────────────────────── */
+
+  function refreshFromCachedData() {
+    if (!allRawData.length) return;
+    processAndRender();
+  }
+
+  document.getElementById("dateSelect").addEventListener("change", () => {
+    const val = document.getElementById("dateSelect").value;
+
+    if (val === "custom") {
+      toggleCustomDateRange(true);
+
+      if (
+        !document.getElementById("dateFrom").value &&
+        !document.getElementById("dateTo").value
+      ) {
+        const todayStr = formatDate(getToday());
+        document.getElementById("dateFrom").value = todayStr;
+        document.getElementById("dateTo").value = todayStr;
+      }
+
+      return;
+    }
+
+    toggleCustomDateRange(false);
+    syncDateInputsFromPreset(val);
+
+    refreshFromCachedData();
+  });
+
+  function onCustomDateChange() {
+    if (
+      document.getElementById("dateSelect").value !== "custom"
+    ) {
+      document.getElementById("dateSelect").value = "custom";
+      toggleCustomDateRange(true);
+    }
+
+    const from = document.getElementById("dateFrom").value;
+    const to = document.getElementById("dateTo").value;
+
+    if (from && to && from > to) {
+      document.getElementById("dateTo").value = from;
+    }
+
+    refreshFromCachedData();
+  }
+
+  document.getElementById("dateFrom")
+    .addEventListener("change", onCustomDateChange);
+
+  document.getElementById("dateTo")
+    .addEventListener("change", onCustomDateChange);
+
+  branchSelect.addEventListener("change", () => {
+    currentSort = { key: "score", dir: "desc" };
+    updateSortHeaders();
+
+    refreshFromCachedData();
+  });
+
+  let searchDebounce = null;
+
+  document.getElementById("searchBox")
+    .addEventListener("input", () => {
+      if (searchDebounce) clearTimeout(searchDebounce);
+
+      searchDebounce = setTimeout(
+        applySearchAndSort,
+        150
+      );
+    });
+
+  /* ── Initial load ────────────────────────────────────────── */
+
+  syncDateInputsFromPreset("today");
+  toggleCustomDateRange(false);
+  updateSortHeaders();
+
+  loadAllData();
+
+  setInterval(() => {
+    if (!isLoading) {
+      loadAllData();
+    }
+  }, AUTO_REFRESH_MS);
+
+</script>
+
+</body>
+</html>
