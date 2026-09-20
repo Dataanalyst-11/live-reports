@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Store Attendant Performance Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0f1923;color:#e0e6ed;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+.hd{background:linear-gradient(135deg,#1a2a3a,#2c3e50);padding:12px 20px;display:flex;align-items:center;justify-content:center;border-bottom:3px solid #e67e22;flex-shrink:0;position:relative}
+.hd h1{font-size:18px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:1px}
+#clock{font-size:13px;color:#8fa4b8;font-weight:600;position:absolute;right:20px}
+.fr{background:#13202d;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid #1e3347;flex-shrink:0}
+.fr label{font-size:11px;color:#6b8299;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.fr input[type=date],.fr select{background:#1a2a3a;color:#e0e6ed;border:1px solid #2c4a63;border-radius:5px;padding:6px 10px;font-size:12px;font-family:inherit;outline:none}
+.fr input[type=date]{min-width:130px}
+.fr select{min-width:160px;cursor:pointer}
+.fr input:focus,.fr select:focus{border-color:#e67e22;box-shadow:0 0 0 2px rgba(230,126,34,.25)}
+.fdiv{width:1px;height:24px;background:#1e3347;flex-shrink:0}
+
+.company-toggle{display:flex;gap:4px;background:#0f1923;border:1px solid #2c4a63;border-radius:6px;padding:3px}
+.company-toggle button{background:transparent;color:#6b8299;border:none;padding:6px 16px;font-size:11px;font-weight:700;text-transform:uppercase;border-radius:4px;cursor:pointer;transition:all .2s}
+.company-toggle button:hover{color:#b0c4d8}
+.company-toggle button.on{background:#e67e22;color:#fff}
+
+.custom-range-bar{display:none;align-items:center;gap:12px}
+.custom-range-bar.active{display:flex}
+
+.xb{background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border:none;border-radius:5px;padding:7px 18px;font-size:11px;font-family:inherit;font-weight:800;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;display:inline-flex;align-items:center;gap:6px;transition:all .2s;box-shadow:0 2px 8px rgba(39,174,96,.3);flex-shrink:0}
+.xb:hover{background:linear-gradient(135deg,#2ecc71,#58d68d);box-shadow:0 4px 14px rgba(39,174,96,.45);transform:translateY(-1px)}
+.xb:active{transform:translateY(0);box-shadow:0 1px 4px rgba(39,174,96,.3)}
+.xb .xi{font-size:14px;line-height:1}
+.xb.disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+.ri{background:#0f1923;padding:5px 20px;font-size:10px;color:#4a6580;border-bottom:1px solid #1a2a3a;flex-shrink:0;display:flex;gap:10px;flex-wrap:wrap}
+.ri .bl{color:#e67e22;font-weight:700}.ri .gr{color:#27ae60;font-weight:600}.ri .pu{color:#9b59b6;font-weight:700;font-family:monospace}.ri .cy{color:#5dade2;font-weight:600}
+.sb{display:flex;background:#162230;border-bottom:1px solid #1e3347;flex-shrink:0}
+.sc{flex:1;min-width:80px;padding:8px 4px;text-align:center;border-right:1px solid #1e3347}
+.sc:last-child{border-right:none}
+.sc .v{font-size:15px;font-weight:800;color:#e67e22}
+.sc .l{font-size:8px;color:#6b8299;text-transform:uppercase;letter-spacing:.3px;margin-top:1px}
+
+.tc{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:45px}
+.tc::-webkit-scrollbar{width:5px}
+.tc::-webkit-scrollbar-track{background:#0f1923}
+.tc::-webkit-scrollbar-thumb{background:#2c3e50;border-radius:3px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;text-align:center;font-size:12px;white-space:nowrap;border:none !important}
+th{background:#162230;color:#8fa4b8;font-size:9px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;position:sticky;top:0;z-index:10}
+tr.rh{background:rgba(39,174,96,.12)}
+tr.rm{background:rgba(241,196,15,.1)}
+tr.rl{background:rgba(231,76,60,.1)}
+.rb{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-weight:800;font-size:11px}
+.r1{background:linear-gradient(135deg,#f1c40f,#e67e22);color:#1a1a1a}
+.r2{background:linear-gradient(135deg,#bdc3c7,#95a5a6);color:#1a1a1a}
+.r3{background:linear-gradient(135deg,#e67e22,#d35400);color:#fff}
+.rx{background:#1e3347;color:#6b8299}
+.an{text-align:left;font-weight:600;color:#e0e6ed}
+.bt{display:inline-block;background:#1e3347;color:#8fa4b8;padding:2px 8px;border-radius:3px;font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.db{display:inline-flex;align-items:center;justify-content:center;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;min-width:32px}
+.db.f{background:rgba(39,174,96,.15);color:#27ae60}
+.db.p{background:rgba(241,196,15,.15);color:#f1c40f}
+.scl{display:flex;align-items:center;justify-content:center;gap:6px}
+.sbw{width:60px;height:5px;background:#1e3347;border-radius:3px;overflow:hidden}
+.sb2{height:100%;border-radius:3px}
+.sh .sb2{background:#27ae60}.sm .sb2{background:#f1c40f}.sl .sb2{background:#e74c3c}
+.st{font-weight:700;min-width:44px;text-align:right}
+.sh .st{color:#27ae60}.sm .st{color:#f1c40f}.sl .st{color:#e74c3c}
+.ft{background:#162230;border-top:2px solid #1e3347;padding:6px 20px;display:flex;justify-content:space-between;font-size:11px;color:#4a6580;flex-shrink:0}
+.lm,.em{padding:50px 20px;text-align:center;font-size:14px}
+.lm{color:#e67e22}.em{color:#e74c3c}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;z-index:9999;opacity:0;transition:all .35s cubic-bezier(.4,0,.2,1);box-shadow:0 6px 20px rgba(39,174,96,.4);pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:linear-gradient(135deg,#e74c3c,#c0392b);box-shadow:0 6px 20px rgba(231,76,60,.4)}
+
+tr.inactive-staff, tr.inactive-staff td {
+    background-color: #FF0000 !important; 
+    color: #000000 !important;           
+    font-style: italic !important;
+}
+tr.inactive-staff .bt, tr.inactive-staff .db {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    color: #000000 !important;
+    font-style: italic !important;
+}
+tr.inactive-staff .rb {
+    background-color: #000000 !important;
+    color: #FF0000 !important;
+    font-style: normal !important; 
+}
+tr.inactive-staff .sbw {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+}
+tr.inactive-staff .sb2 {
+    background-color: #000000 !important;
+}
+tr.inactive-staff .st {
+    color: #000000 !important;
+}
+</style>
+</head>
+<body>
+<div class="hd"><h1 id="pageTitle">📦 Store Attendant Performance — Pharma</h1><div id="clock"></div></div>
+<div class="fr">
+    <div class="company-toggle">
+        <button id="btnPharma" class="on" onclick="switchCompany('pharma')">Pharma</button>
+        <button id="btnBeibora" onclick="switchCompany('beibora')">Beibora</button>
+    </div>
+    <div class="fdiv"></div>
+
+    <div>
+        <label>Period</label>
+        <select id="periodSelect" onchange="handlePeriodChange()">
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="custom">Custom Range</option>
+        </select>
+    </div>
+    
+    <div class="custom-range-bar" id="customRangeBar">
+        <div><label>From</label><input type="date" id="sd"></div>
+        <div><label>To</label><input type="date" id="ed"></div>
+    </div>
+
+    <div class="fdiv"></div>
+    <div><label>Branch</label><select id="bf"><option value="ALL">All Branches</option></select></div>
+    <div class="fdiv"></div>
+    <button class="xb" id="xbtn" onclick="exportExcel()"><span class="xi">📥</span> Export Excel</button>
+</div>
+
+<div class="ri" id="ri">Loading...</div>
+<div class="sb">
+<div class="sc"><div class="v" id="s1">--</div><div class="l">Attendants</div></div>
+<div class="sc"><div class="v" id="s2">--</div><div class="l">Period Days</div></div>
+<div class="sc"><div class="v" id="s3">--</div><div class="l">Total Orders</div></div>
+<div class="sc"><div class="v" id="s4">--</div><div class="l">Total Items</div></div>
+<div class="sc"><div class="v" id="s5">--</div><div class="l">Avg Score</div></div>
+<div class="sc"><div class="v" id="s6">--</div><div class="l">Top Score</div></div>
+<div class="sc"><div class="v" id="s7">--</div><div class="l">Branches</div></div>
+<div class="sc"><div class="v" id="s11" title="Total orders YTD ÷ Working Days (excl. Saturdays) from Jan 1 to today">--</div><div class="l">Daily Avg Orders (WD YTD)</div></div>
+<div class="sc"><div class="v" id="s9" title="Average orders per attendant from Jan 1 to today (Independent of Date Filter)">--</div><div class="l">Avg Orders (YTD)</div></div>
+<div class="sc"><div class="v" id="s10" title="Daily Average Invoices (Working Days YTD) ÷ 100 (Independent of Date Filter)">--</div><div class="l">Attendants Needed (YTD)</div></div>
+</div>
+<div class="tc" id="tc">
+<table><thead><tr>
+<th style="width:46px">Rank</th><th>Store Attendant</th><th>Branch</th><th>Entries</th><th>Hrs Worked</th><th>Total Orders</th><th>Line Items</th><th>Items/Hr</th><th>Orders/Hr</th><th>Avg Order Val</th><th>Last Duty</th><th style="width:120px">Efficiency</th>
+</tr></thead><tbody id="tb"><tr><td colspan="12" class="lm">Loading data...</td></tr></tbody></table>
+</div>
+
+<div style="position:fixed;bottom:0;left:60px;right:0;z-index:90;background:#1e3a8a;border-top:2px solid #172554;overflow:hidden;height:36px;display:flex;align-items:center;">
+  <div style="display:flex;white-space:nowrap;animation:scrollFooter 18s linear infinite;font-weight:700;font-size:.78rem;color:#ffffff;letter-spacing:.3px; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);">
+    <span style="padding:0 40px">Last updated: <span id="lu">--</span></span>
+    <span style="color:var(--accent);padding:0 8px; text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);">●</span>
+    <span style="padding:0 40px">Designed and Managed by MIS.DPT</span>
+    <span style="color:var(--accent);padding:0 8px; text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);">●</span>
+    <span style="padding:0 40px">Last updated: <span id="lu2">--</span></span>
+    <span style="color:var(--accent);padding:0 8px; text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);">●</span>
+    <span style="padding:0 40px">Designed and Managed by MIS.DPT</span>
+    <span style="color:var(--accent);padding:0 8px; text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);">●</span>
+  </div>
+</div>
+
+<style>
+@keyframes scrollFooter {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+</style>
+
+<script>
+const now = new Date();
+const dateStr = now.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+const timeStr = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+const full = dateStr + ', ' + timeStr;
+document.getElementById('lu').textContent = full;
+document.getElementById('lu2').textContent = full;
+</script>
+
+<div class="toast" id="toast"></div>
+    
+<script>
+  // Proxy URLs only — real tokens live in the Cloudflare worker.
+  window.API_CONFIG = {
+    API_URL: "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/pharma/"
+  };
+  window.BEIBORA_CONFIG = {
+    API_URL: "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/beibora/"
+  };
+</script>
+
+<script>
+let currentCompany = "pharma";
+const DF='createdAt', FETCH_DAYS=365;
+
+let cache = { pharma: [], beibora: [] }; 
+let raw=[], filt=[], all=[], pd=7, ld=false, fetching=false, silent=false;
+const BK='spbf';
+
+function showToast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (isErr ? ' err' : '');
+    requestAnimationFrame(() => t.classList.add('show'));
+    clearTimeout(t._tid);
+    t._tid = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function updClk() {
+    const n = new Date();
+    document.getElementById('clock').textContent = n.toLocaleDateString(undefined, {weekday:'short',month:'short',day:'numeric'}) + ' — ' + n.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+setInterval(updClk, 1000); updClk();
+
+// Helper to get the active config based on toggle
+//To load the correct config file
+function getActiveConfig() {
+    return currentCompany === "pharma" ? window.API_CONFIG : window.BEIBORA_CONFIG;
+}
+
+
+function switchCompany(company) {
+    currentCompany = company;
+    document.getElementById("btnPharma").classList.toggle("on", company === "pharma");
+    document.getElementById("btnBeibora").classList.toggle("on", company === "beibora");
+    document.getElementById("pageTitle").textContent = company === "pharma" 
+        ? "📦 Store Attendant Performance — Pharma" 
+        : "📦 Store Attendant Performance — Beibora";
+    
+    document.getElementById('bf').innerHTML = '<option value="ALL">All Branches</option>';
+    document.getElementById('periodSelect').value = 'today';
+    document.getElementById('customRangeBar').classList.remove('active');
+    
+    const d = gdr('today');
+    document.getElementById('sd').value = d.s;
+    document.getElementById('ed').value = d.e;
+
+    if (cache[company].length > 0) {
+        raw = cache[company];
+        ld = true;
+        applyF();
+    } else {
+        raw = []; filt = []; all = []; ld = false;
+        go(false);
+    }
+}
+
+function fdu(d) { return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }
+function fdn(s) { if(!s) return ''; return new Date(s+'T00:00:00Z').toLocaleDateString(undefined, {day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}); }
+
+function getFetchWindow() {
+    const now = new Date();
+    const end = fdu(now);
+    const startD = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    startD.setUTCDate(startD.getUTCDate() - (FETCH_DAYS - 1));
+    return { s: fdu(startD), e: end };
+}
+
+function gdr(k) {
+    const n = new Date();
+    let s = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()));
+    let e = new Date(s);
+    switch(k) {
+        case 'today': break;
+        case 'yesterday': s.setUTCDate(s.getUTCDate()-1); e = new Date(s); break;
+        case '7d': s.setUTCDate(s.getUTCDate()-6); break;
+        case '30d': s.setUTCDate(s.getUTCDate()-29); break;
+        case '90d': s.setUTCDate(s.getUTCDate()-89); break;
+    }
+    return { s: fdu(s), e: fdu(e) };
+}
+
+function gpd(a, b) { return Math.round(Math.abs(new Date(b+'T00:00:00Z') - new Date(a+'T00:00:00Z')) / 864e5) + 1; }
+
+function exd(r) {
+    const v = r[DF];
+    if (v == null) return null;
+    const s = String(v).trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+    if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}$/.test(s)) {
+        const p = s.split(/[\/\-\.]/), a = +p[0], b = +p[1], c = +p[2];
+        if (a > 12 && b >= 1 && b <= 12) return c+'-'+String(b).padStart(2,'0')+'-'+String(a).padStart(2,'0');
+        if (a >= 1 && a <= 31 && b >= 1 && b <= 12) return c+'-'+String(b).padStart(2,'0')+'-'+String(a).padStart(2,'0');
+        if (b >= 1 && b <= 31 && a >= 1 && a <= 12) return c+'-'+String(a).padStart(2,'0')+'-'+String(b).padStart(2,'0');
+    }
+    if (/^\d{13}$/.test(s)) { const d = new Date(+s); if (!isNaN(d) && d.getFullYear() >= 2000) return fdu(d); }
+    if (/^\d{10}$/.test(s)) { const d = new Date(+s*1e3); if (!isNaN(d) && d.getFullYear() >= 2000) return fdu(d); }
+    return null;
+}
+
+function burl(p) {
+    const config = getActiveConfig();
+    let b = config.API_URL;
+    if (!b) return ""; 
+    if (!b.endsWith('/')) b += '/';
+    const endpoint = currentCompany === "pharma" ? "store-picker-reports" : "order-tracking/list-store-picker-reports";
+    return b + endpoint + (p ? '?' + p : '');
+}
+
+function agg(rawData) {
+    const m = {};
+    rawData.forEach(r => {
+        if (r.isDeleted) return;
+        const n = (r.storePickerName || '').trim(), br = (r.orgBranchName || '').trim();
+        if (!n) return;
+        const k = n + '|||' + br;
+        if (!m[k]) m[k] = { storePickerName: n, orgBranchName: br, numberOfOrders: 0, numberOfLineItems: 0, orderAmount: 0, ec: 0, maxDate: '' };
+        m[k].numberOfOrders += (r.numberOfOrders || 0);
+        m[k].numberOfLineItems += (r.numberOfLineItems || 0);
+        m[k].orderAmount += (r.orderAmount || 0);
+        m[k].ec += 1;
+        
+        const d = exd(r);
+        if (d && d > m[k].maxDate) m[k].maxDate = d;
+    });
+    return Object.values(m).map(a => {
+        const d = Math.max(1, a.ec);
+        delete a.ec;
+        return { ...a, daysWorked: d, hoursWorked: d * 10, lastDutyDate: a.maxDate };
+    });
+}
+
+function calcPct(l) {
+    if (!l.length) return;
+    const o = l.map(a => a.numberOfOrders / a.hoursWorked);
+    const i = l.map(a => a.numberOfLineItems / a.hoursWorked);
+    const v = l.map(a => a.numberOfOrders ? a.orderAmount / a.numberOfOrders : 0);
+    const pc = (arr, val) => (arr.filter(x => x <= val).length / arr.length) * 100;
+    l.forEach(a => {
+        const op = a.numberOfOrders / a.hoursWorked;
+        const ip = a.numberOfLineItems / a.hoursWorked;
+        const av = a.numberOfOrders ? a.orderAmount / a.numberOfOrders : 0;
+        a.pf = { ordersPerHour: op, itemsPerHour: ip, avgOrderValue: av, score: pc(o, op) * .4 + pc(i, ip) * .3 + pc(v, av) * .3 };
+    });
+}
+
+function scc(s) { return s >= 80 ? 'sh' : s >= 50 ? 'sm' : 'sl'; }
+function rwc(s) { return s >= 80 ? 'rh' : s >= 50 ? 'rm' : 'rl'; }
+function rkc(r) { return r === 1 ? 'r1' : r === 2 ? 'r2' : r === 3 ? 'r3' : 'rx'; }
+
+// Filter staff active within the last 10 days
+function filterOnDuty10Days(data) {
+    const today = new Date();
+    const tenDaysAgo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 10));
+    const tenDaysAgoStr = fdu(tenDaysAgo);
+    return data.filter(a => a.lastDutyDate && a.lastDutyDate >= tenDaysAgoStr);
+}
+
+function getAllInRangeData() {
+    const bv = document.getElementById('bf').value;
+    return bv === 'ALL' ? [...all] : all.filter(a => a.orgBranchName === bv);
+}
+
+/* === YTD metrics: uses cached `raw` data, entirely ignoring UI date filters === */
+function getYTDData() {
+    if (!raw.length) return { avg: 0, total: 0, attendants: 0, dailyAvg: 0, workingDays: 0 };
+    const now = new Date();
+    const ytdStart = fdu(new Date(Date.UTC(now.getUTCFullYear(), 0, 1)));
+    const todayStr = fdu(now);
+    const ytdRaw = raw.filter(r => { const d = exd(r); return d && d >= ytdStart && d <= todayStr; });
+    let ytdAgg = agg(ytdRaw);
+    
+    const bv = document.getElementById('bf').value;
+    if (bv !== 'ALL') ytdAgg = ytdAgg.filter(a => a.orgBranchName === bv);
+    
+    if (!ytdAgg.length) return { avg: 0, total: 0, attendants: 0, dailyAvg: 0, workingDays: 0 };
+    const totalOrders = ytdAgg.reduce((s, a) => s + a.numberOfOrders, 0);
+    
+    // Calculate Working Days from Jan 1 to Today (Excluding Saturdays -> 6 in getUTCDay)
+    const start = new Date(ytdStart + 'T00:00:00Z');
+    const end = new Date(todayStr + 'T00:00:00Z');
+    let ytdWorkingDays = 0;
+    let tempDate = new Date(start);
+    while (tempDate <= end) {
+        if (tempDate.getUTCDay() !== 6) {
+            ytdWorkingDays++;
+        }
+        tempDate.setUTCDate(tempDate.getUTCDate() + 1);
+    }
+    
+    return { 
+        avg: totalOrders / ytdAgg.length, 
+        total: totalOrders, 
+        attendants: ytdAgg.length,
+        workingDays: ytdWorkingDays,
+        dailyAvg: ytdWorkingDays > 0 ? totalOrders / ytdWorkingDays : 0 
+    };
+}
+
+function popBr() {
+    const sel = document.getElementById('bf'), cv = sel.value;
+    const br = [...new Set(all.map(a => a.orgBranchName))].filter(Boolean).sort();
+    const ex = [];
+    for (let i = 1; i < sel.options.length; i++) ex.push(sel.options[i].value);
+    if (br.length === ex.length && br.every((b, i) => b === ex[i])) {
+        if (![...sel.options].some(o => o.value === cv)) sel.value = 'ALL';
+        return;
+    }
+    while (sel.options.length > 1) sel.remove(1);
+    br.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; sel.appendChild(o); });
+    if ([...sel.options].some(o => o.value === cv)) sel.value = cv;
+    else {
+        const sv = localStorage.getItem(BK);
+        if (sv && [...sel.options].some(o => o.value === sv)) sel.value = sv;
+    }
+}
+
+function updSt(displayData, allInRange) {
+    const n = displayData.length;
+    document.getElementById('s1').textContent = n;
+    document.getElementById('s2').textContent = pd + 'd';
+    
+    document.getElementById('s3').textContent = allInRange.reduce((s, a) => s + a.numberOfOrders, 0).toLocaleString();
+    document.getElementById('s4').textContent = allInRange.reduce((s, a) => s + a.numberOfLineItems, 0).toLocaleString();
+    
+    const av = n ? displayData.reduce((s, a) => s + a.pf.score, 0) / n : 0;
+    document.getElementById('s5').textContent = av.toFixed(1) + '%';
+    document.getElementById('s6').textContent = n ? Math.max(...displayData.map(a => a.pf.score)).toFixed(1) + '%' : '0%';
+    
+    document.getElementById('s7').textContent = new Set(allInRange.map(a => a.orgBranchName)).size;
+    
+    // YTD metrics (Independent of Date Filter Range)
+    const ytdData = getYTDData();
+    
+    // 1. Daily Average Orders YTD (Based on working days excluding Saturdays)
+    document.getElementById('s11').textContent = ytdData.dailyAvg.toFixed(0);
+    
+    // 2. Average Orders per attendant YTD
+    document.getElementById('s9').textContent = ytdData.avg.toFixed(0);
+    
+    // 3. Attendants Needed (Strictly Daily Average Invoices YTD ÷ 100)
+    const attendantsNeeded = Math.ceil(ytdData.dailyAvg / 100);
+    document.getElementById('s10').textContent = attendantsNeeded;
+}
+
+function updRi(s, e, tc, fc) {
+    const d = gpd(s, e);
+    document.getElementById('ri').innerHTML =
+        '<span class="gr">✅ Filtered by <span class="pu">' + DF + '</span> (raw UTC)</span> · ' +
+        '<span class="bl">Period:</span> ' + fdn(s) + ' — ' + fdn(e) + ' <span style="color:#4a6580">(' + d + (d === 1 ? ' day' : ' days') + ')</span> · ' +
+        '<span class="gr">' + fc.toLocaleString() + ' of ' + tc.toLocaleString() + ' records</span> · ' +
+        '<span class="cy">🔄 Fetch window: Last 365 Days</span> · ' +
+        '<span style="color:#e67e22;font-weight:700">⚠ Display: Active staff only (on duty within last 10 days)</span>';
+}
+
+function buildRows(d) {
+    if (!d.length) return '<tr><td colspan="12" class="em">No active staff on duty in the last 10 days for this selection.</td></tr>';
+    
+    // Sort by score (already calculated in applyBr/getDisplayData)
+    d.sort((a, b) => b.pf.score - a.pf.score);
+    
+    return d.map((a, i) => {
+        const r = i + 1, sc = scc(a.pf.score), rc = rkc(r), rw = rwc(a.pf.score), dc = a.daysWorked >= pd ? 'f' : 'p';
+        return '<tr class="' + rw + '"><td><span class="rb ' + rc + '">' + r + '</span></td><td class="an">' + (a.storePickerName || '—') + '</td><td><span class="bt" title="' + (a.orgBranchName || '') + '">' + (a.orgBranchName || '—') + '</span></td><td><span class="db ' + dc + '">' + a.daysWorked + '/' + pd + '</span></td><td>' + a.hoursWorked + '</td><td>' + a.numberOfOrders.toLocaleString() + '</td><td>' + a.numberOfLineItems.toLocaleString() + '</td><td>' + a.pf.itemsPerHour.toFixed(2) + '</td><td>' + a.pf.ordersPerHour.toFixed(2) + '</td><td>' + a.pf.avgOrderValue.toFixed(0) + '</td><td>' + (a.lastDutyDate ? fdn(a.lastDutyDate) : '—') + '</td><td><div class="scl ' + sc + '"><div class="sbw"><div class="sb2" style="width:' + a.pf.score + '%"></div></div><span class="st">' + a.pf.score.toFixed(1) + '%</span></div></td></tr>';
+    }).join('');
+}
+
+function proc(s, e) {
+    pd = gpd(s, e);
+    all = agg(filt).map(a => ({ ...a, pf: null }));
+    updRi(s, e, raw.length, filt.length);
+    popBr();
+    applyBr();
+}
+
+function getDisplayData() {
+    const bv = document.getElementById('bf').value;
+    const allInRange = bv === 'ALL' ? [...all] : all.filter(a => a.orgBranchName === bv);
+    
+    // ORIGINAL LOGIC: Calculate performance for ALL staff in range first!
+    if (allInRange.length) calcPct(allInRange);
+    
+    // THEN filter to only active staff (on duty within last 10 days)
+    let d = filterOnDuty10Days(allInRange);
+    d.sort((a, b) => b.pf.score - a.pf.score);
+    return d;
+}
+
+function applyBr() {
+    const v = document.getElementById('bf').value;
+    const allInRange = v === 'ALL' ? [...all] : all.filter(a => a.orgBranchName === v);
+    
+    // ORIGINAL LOGIC: Calculate performance for ALL staff in range first!
+    if (allInRange.length) calcPct(allInRange);
+    
+    // THEN filter to only active staff (on duty within last 10 days)
+    const displayData = filterOnDuty10Days(allInRange);
+    displayData.sort((a, b) => b.pf.score - a.pf.score);
+    
+    const tb = document.getElementById('tb'), tc = document.getElementById('tc');
+    if (!silent) {
+        tb.innerHTML = buildRows(displayData);
+        updSt(displayData, allInRange);
+        tc.scrollTop = 0;
+    } else {
+        const sv = tc.scrollTop;
+        tb.innerHTML = buildRows(displayData);
+        updSt(displayData, allInRange);
+        tc.scrollTop = sv;
+    }
+}
+
+function applyF() {
+    const s = document.getElementById('sd').value, e = document.getElementById('ed').value;
+    if (!s || !e || !ld) return;
+    filt = raw.filter(r => { const d = exd(r); return d && d >= s && d <= e; });
+    proc(s, e);
+}
+
+async function fetchAllData(params) {
+    const u = burl(params);
+    const resp = await fetch(u);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const j = await resp.json();
+    return Array.isArray(j) ? j : (j.data || []);
+}
+
+async function go(sl) {
+    if (fetching) return;
+    fetching = true;
+    const tb = document.getElementById('tb'), tc = document.getElementById('tc'), sv = tc.scrollTop;
+    
+    if (!sl) tb.innerHTML = '<tr><td colspan="12" class="lm">Loading data (Last 365 Days)...</td></tr>';
+
+    var fw = getFetchWindow();
+    var fetchParams = 'pageSize=100000&startDate=' + fw.s + '&endDate=' + fw.e;
+
+    let data = [], err = null;
+    try {
+        data = await fetchAllData(fetchParams);
+    } catch (e) {
+        err = e;
+    }
+
+    if (!data || !data.length) {
+        if (!sl) tb.innerHTML = '<tr><td colspan="12" class="em">Failed to fetch data<br><small style="color:#e67e22">' + burl(fetchParams) + '</small><br><small style="color:#8fa4b8">Error: ' + (err ? err.message : 'Unknown') + '</small></td></tr>';
+        fetching = false;
+        return;
+    }
+
+    raw = data;
+    cache[currentCompany] = raw;
+    ld = true;
+    document.getElementById('lu').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    if (sl) {
+        silent = true;
+        applyF();
+        silent = false;
+        tc.scrollTop = sv;
+    } else {
+        silent = false;
+        applyF();
+        var savedBranch = localStorage.getItem(BK);
+        if (savedBranch) {
+            var sel2 = document.getElementById('bf');
+            if ([...sel2.options].some(o => o.value === savedBranch)) {
+                sel2.value = savedBranch;
+                applyBr();
+            }
+        }
+    }
+    fetching = false;
+}
+
+function handlePeriodChange() {
+    const val = document.getElementById('periodSelect').value;
+    const bar = document.getElementById('customRangeBar');
+    
+    if (val === 'custom') {
+        bar.classList.add('active');
+        if (!document.getElementById('sd').value || !document.getElementById('ed').value) {
+            const d = gdr('today');
+            document.getElementById('sd').value = d.s;
+            document.getElementById('ed').value = d.e;
+        }
+    } else {
+        bar.classList.remove('active');
+        const d = gdr(val);
+        document.getElementById('sd').value = d.s;
+        document.getElementById('ed').value = d.e;
+        applyF();
+    }
+}
+
+/* ========== EXPORT TO EXCEL ========== */
+async function exportExcel() {
+    const btn = document.getElementById('xbtn');
+    const data = getDisplayData(); // Already calculates pct on ALL in range, then filters to 10 days active
+    const allInRange = getAllInRangeData();
+    
+    if (!data.length) {
+        showToast('No active staff on duty in last 10 days to export.', true);
+        return;
+    }
+
+    btn.classList.add('disabled');
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="xi">⏳</span> Exporting...';
+
+    const sVal = document.getElementById('sd').value;
+    const eVal = document.getElementById('ed').value;
+    const brVal = document.getElementById('bf').value;
+    
+    const totalOrders = allInRange.reduce((s, a) => s + a.numberOfOrders, 0);
+    const totalItems = allInRange.reduce((s, a) => s + a.numberOfLineItems, 0);
+    const avgScore = data.reduce((s, a) => s + a.pf.score, 0) / data.length;
+    
+    // YTD Data for export
+    const ytdData = getYTDData();
+    const attendantsNeeded = Math.ceil(ytdData.dailyAvg / 100);
+
+    const wb = new ExcelJS.Workbook();
+    
+    const ws1 = wb.addWorksheet('Store Attendant Performance', {
+        properties: { defaultRowHeight: 22 },
+        views: [{ showGridLines: false }]
+    });
+
+    ws1.columns = [
+        { header: 'Rank', key: 'rank', width: 8 },
+        { header: 'Store Attendant', key: 'name', width: 30 },
+        { header: 'Branch', key: 'branch', width: 25 },
+        { header: 'Days Worked', key: 'days', width: 14 },
+        { header: 'Hrs Worked', key: 'hrs', width: 14 },
+        { header: 'Total Orders', key: 'orders', width: 14 },
+        { header: 'Line Items', key: 'items', width: 14 },
+        { header: 'Items/Hr', key: 'iph', width: 12 },
+        { header: 'Orders/Hr', key: 'oph', width: 12 },
+        { header: 'Avg Order Val', key: 'aov', width: 16 },
+        { header: 'Last Duty Date', key: 'lastduty', width: 16 },
+        { header: 'Efficiency Score', key: 'score', width: 18 },
+        { header: 'Performance', key: 'perf', width: 15 }
+    ];
+
+    const headerRow = ws1.getRow(1);
+    headerRow.height = 26;
+    headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF162230' } };
+        cell.font = { color: { argb: 'FFE67E22' }, bold: true, size: 11 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE67E22' } } };
+    });
+
+    data.forEach((a, i) => {
+        const r = i + 1;
+        const score = a.pf.score;
+        const perf = score >= 80 ? 'High' : score >= 50 ? 'Medium' : 'Low';
+        
+        let rowBg = 'FF0F1923';
+        if (score >= 80) rowBg = 'FF13241A';
+        else if (score >= 50) rowBg = 'FF242118';
+        else rowBg = 'FF241511';
+
+        let scoreColor = 'FFE0E6ED';
+        if (score >= 80) scoreColor = 'FF27AE60';
+        else if (score >= 50) scoreColor = 'FFF1C40F';
+        else scoreColor = 'FFE74C3C';
+
+        const row = ws1.addRow({
+            rank: r,
+            name: a.storePickerName,
+            branch: a.orgBranchName,
+            days: a.daysWorked,
+            hrs: a.hoursWorked,
+            orders: a.numberOfOrders,
+            items: a.numberOfLineItems,
+            iph: parseFloat(a.pf.itemsPerHour.toFixed(2)),
+            oph: parseFloat(a.pf.ordersPerHour.toFixed(2)),
+            aov: parseFloat(a.pf.avgOrderValue.toFixed(0)),
+            lastduty: a.lastDutyDate ? fdn(a.lastDutyDate) : '—',
+            score: parseFloat(score.toFixed(1)),
+            perf: perf
+        });
+
+        row.height = 22;
+        
+        row.eachCell((cell, colNumber) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+            cell.font = { color: { argb: 'FFE0E6ED' }, size: 11 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.border = {};
+
+            if (colNumber === 1) {
+                if (r === 1) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1C40F' } };
+                    cell.font = { color: { argb: 'FF1A1A1A' }, bold: true, size: 11 };
+                } else if (r === 2) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF95A5A6' } };
+                    cell.font = { color: { argb: 'FF1A1A1A' }, bold: true, size: 11 };
+                } else if (r === 3) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE67E22' } };
+                    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 11 };
+                }
+            }
+            
+            if (colNumber === 2 || colNumber === 3) {
+                cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+            }
+
+            if (colNumber === 6 || colNumber === 7 || colNumber === 10) {
+                cell.numFmt = '#,##0';
+            }
+            if (colNumber === 8 || colNumber === 9) {
+                cell.numFmt = '0.00';
+            }
+            
+            if (colNumber === 12) { // Score column shifted left after removing Order Value
+                cell.font = { color: { argb: scoreColor }, bold: true, size: 11 };
+                cell.numFmt = '0.0"%"';
+            }
+        });
+    });
+
+    const ws2 = wb.addWorksheet('Summary', {
+        properties: { defaultRowHeight: 20 },
+        views: [{ showGridLines: false }]
+    });
+    
+    ws2.columns = [
+        { header: 'Metric', key: 'metric', width: 40 },
+        { header: 'Value', key: 'value', width: 50 }
+    ];
+
+    const headerRow2 = ws2.getRow(1);
+    headerRow2.height = 26;
+    headerRow2.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF162230' } };
+        cell.font = { color: { argb: 'FFE67E22' }, bold: true, size: 11 };
+        cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE67E22' } } };
+    });
+
+    const summaryData = [
+        { metric: 'Report Generated', value: new Date().toLocaleString() },
+        { metric: 'Period Start', value: fdn(sVal) },
+        { metric: 'Period End', value: fdn(eVal) },
+        { metric: 'Period Days', value: pd },
+        { metric: 'Branch Filter', value: brVal === 'ALL' ? 'All Branches' : brVal },
+        { metric: 'Backend Fetch Window', value: 'Last 365 Days' },
+        { metric: '', value: '' },
+        { metric: '📊 DISPLAY (10-Day Active Staff Only)', value: '' },
+        { metric: 'Displayed Attendants (on duty last 10 days)', value: data.length },
+        { metric: 'Average Efficiency (displayed)', value: avgScore.toFixed(1) + '%' },
+        { metric: 'Top Efficiency (displayed)', value: Math.max(...data.map(a => a.pf.score)).toFixed(1) + '%' },
+        { metric: 'Top Performer', value: data[0].storePickerName + ' (' + data[0].orgBranchName + ')' },
+        { metric: '', value: '' },
+        { metric: '📈 TOTALS (All Staff in Date Range)', value: '' },
+        { metric: 'Total Attendants (in date range)', value: allInRange.length },
+        { metric: 'Total Orders (all staff in date range)', value: totalOrders.toLocaleString() },
+        { metric: 'Total Line Items', value: totalItems.toLocaleString() },
+        { metric: '', value: '' },
+        { metric: '⚖️ WORKLOAD ANALYSIS (YTD - Constant vs Date Filter)', value: '' },
+        { metric: 'Total Orders (YTD)', value: ytdData.total.toLocaleString() },
+        { metric: 'Working Days Elapsed (YTD, excl. Saturdays)', value: ytdData.workingDays },
+        { metric: 'Daily Average Invoices (YTD Working Days)', value: ytdData.dailyAvg.toFixed(0) },
+        { metric: 'Avg Orders per Attendant (YTD)', value: ytdData.avg.toFixed(0) },
+        { metric: 'Benchmark per Attendant', value: '100 orders/day' },
+        { metric: 'Attendants Needed (Daily Avg YTD ÷ 100)', value: attendantsNeeded },
+        { metric: '', value: '' },
+        { metric: 'High Performers (>=80%)', value: data.filter(a => a.pf.score >= 80).length },
+        { metric: 'Medium Performers (50-79%)', value: data.filter(a => a.pf.score >= 50 && a.pf.score < 80).length },
+        { metric: 'Low Performers (<50%)', value: data.filter(a => a.pf.score < 50).length },
+    ];
+
+    summaryData.forEach(item => {
+        const row = ws2.addRow(item);
+        row.height = 20;
+        row.eachCell((cell, colNumber) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F1923' } };
+            cell.font = { color: { argb: 'FFE0E6ED' }, size: 11 };
+            cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+            cell.border = {};
+            
+            if (item.metric.startsWith('📊') || item.metric.startsWith('📈') || item.metric.startsWith('⚖️')) {
+                cell.font = { color: { argb: 'FFE67E22' }, size: 11, bold: true };
+            }
+            
+            if (colNumber === 2 && item.value !== '') {
+                cell.font = { color: { argb: 'FF8FA4B8' }, size: 11, bold: true };
+            }
+        });
+    });
+
+    const brSlug = brVal === 'ALL' ? 'AllBranches' : brVal.replace(/[^a-zA-Z0-9]/g, '_');
+    const fname = 'StoreAttendant_Performance_' + sVal + '_to_' + eVal + '_' + brSlug + '.xlsx';
+
+    try {
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        saveAs(blob, fname);
+        showToast('Exported ' + data.length + ' records (10-day active) to Excel ✓', false);
+    } catch (e) {
+        showToast('Export failed: ' + e.message, true);
+    } finally {
+        btn.classList.remove('disabled');
+        btn.innerHTML = originalHtml;
+    }
+}
+
+/* Event listeners */
+document.getElementById('sd').addEventListener('change', function() {
+    document.getElementById('periodSelect').value = 'custom';
+    document.getElementById('customRangeBar').classList.add('active');
+    applyF();
+});
+document.getElementById('ed').addEventListener('change', function() {
+    document.getElementById('periodSelect').value = 'custom';
+    document.getElementById('customRangeBar').classList.add('active');
+    applyF();
+});
+document.getElementById('bf').addEventListener('change', function() {
+    localStorage.setItem(BK, this.value);
+    applyBr();
+});
+
+/* ========== INITIALIZATION ========== */
+(function init() {
+    const d = gdr('today');
+    document.getElementById('sd').value = d.s;
+    document.getElementById('ed').value = d.e;
+    document.getElementById('periodSelect').value = 'today';
+
+    go(false);
+
+    setInterval(() => go(true), 1200000);
+})();
+</script>
+</body>
+</html>
