@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocForge — Excel Toolkit</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0b0a;--surface:#131514;--surface2:#1a1c1b;--border:#262927;
+  --fg:#e2e6e3;--dim:#5e6b65;--accent:#00e676;--accent-bg:rgba(0,230,118,.08);
+  --red:#ff5252;--red-bg:rgba(255,82,82,.08);--amber:#ffab40;--amber-bg:rgba(255,171,64,.08)
+}
+html{scroll-behavior:smooth}
+body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--fg);min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Loader */
+#loader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .4s}
+#loader.done{opacity:0;pointer-events:none}
+.spinner{width:28px;height:28px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .55s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Sidebar */
+#sidebar{position:fixed;left:0;top:0;bottom:0;width:60px;background:var(--surface);border-right:1px solid var(--border);z-index:100;display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:1px;overflow-y:auto;overflow-x:hidden;height:100vh}
+#sidebar::-webkit-scrollbar{width:0}
+.logo{width:36px;height:36px;border-radius:8px;background:var(--accent-bg);border:1px solid rgba(0,230,118,.15);display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-weight:800;font-size:.7rem;color:var(--accent);letter-spacing:-.5px;flex-shrink:0}
+.nav-btn{width:42px;height:42px;border-radius:9px;border:none;background:transparent;color:var(--dim);font-size:.9rem;cursor:pointer;transition:all .15s;position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.nav-btn:hover{background:rgba(255,255,255,.03);color:var(--fg)}
+.nav-btn.active{background:var(--accent-bg);color:var(--accent)}
+.nav-btn .tip{position:absolute;left:54px;background:var(--surface2);border:1px solid var(--border);color:var(--fg);font-size:.68rem;padding:4px 8px;border-radius:5px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .1s;z-index:200}
+.nav-btn:hover .tip{opacity:1}
+
+/* Main */
+#main{margin-left:60px;min-height:100vh;padding:24px 16px 60px}
+.page{display:none;animation:fadeUp .25s ease}
+.page.visible{display:block}
+.page.narrow{max-width:700px;margin:0 auto}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Drop zone */
+.drop-zone{border:2px dashed var(--border);border-radius:11px;padding:36px 20px;text-align:center;cursor:pointer;transition:all .18s;position:relative}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:var(--accent-bg)}
+.drop-zone .icon{font-size:1.6rem;color:var(--dim);margin-bottom:12px}
+
+/* Card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+
+/* Buttons */
+.btn{padding:8px 20px;border-radius:7px;border:none;font-family:inherit;font-weight:600;font-size:.82rem;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#0a0b0a}.btn-primary:hover{box-shadow:0 0 18px rgba(0,230,118,.25)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--fg)}.btn-ghost:hover{border-color:var(--dim);background:rgba(255,255,255,.02)}
+
+/* Toast */
+#toasts{position:fixed;top:14px;right:14px;z-index:10000;display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.toast{pointer-events:auto;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 14px;font-size:.8rem;display:flex;align-items:center;gap:7px;animation:toastIn .2s ease;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:320px}
+.toast.success{border-left:3px solid var(--accent)}
+.toast.error{border-left:3px solid var(--red)}
+.toast.warn{border-left:3px solid var(--amber)}
+@keyframes toastIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateX(16px)}}
+
+/* File item */
+.file-item{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--bg);border:1px solid var(--border);border-radius:7px;transition:border-color .15s}
+.file-item:hover{border-color:var(--dim)}
+.file-item .name{font-size:.8rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-item .size{font-size:.7rem;color:var(--dim);flex-shrink:0}
+.file-item .remove{width:26px;height:26px;border-radius:5px;border:none;background:var(--red-bg);color:var(--red);font-size:.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s}
+.file-item .remove:hover{background:var(--red);color:#fff}
+
+/* Checkbox */
+.opt-checkbox{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--dim);margin-top:14px;cursor:pointer;width:fit-content}
+.opt-checkbox input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+
+/* Hidden utility */
+.hidden{display:none!important}
+
+/* Glow blobs */
+.glow{position:fixed;border-radius:50%;filter:blur(100px);opacity:.06;pointer-events:none;z-index:0}
+</style>
+</head>
+<body>
+
+<div id="loader"><div class="spinner"></div><span style="font-size:.75rem;color:var(--dim)">Loading...</span></div>
+<div class="glow" style="width:350px;height:350px;top:-80px;left:-80px;background:var(--accent)"></div>
+<div class="glow" style="width:300px;height:300px;bottom:-60px;right:-60px;background:var(--red)"></div>
+<div id="toasts"></div>
+
+<!-- Sidebar -->
+<nav id="sidebar">
+  <div class="logo">DF</div>
+  <button class="nav-btn active" data-page="consolidate" onclick="go('consolidate')"><i class="fas fa-layer-group"></i><span class="tip">Consolidate Data</span></button>
+  <button class="nav-btn" data-page="compile" onclick="go('compile')"><i class="fas fa-folder-tree"></i><span class="tip">Compile Workbook</span></button>
+</nav>
+
+<div id="main">
+
+<!-- ====== CONSOLIDATE DATA (VERTICAL STACK) ====== -->
+<div class="page narrow visible" id="pg-consolidate">
+  <h2 style="font-size:1.3rem;font-weight:800;letter-spacing:-.4px;margin-bottom:3px">Consolidate Data</h2>
+  <p style="font-size:.78rem;color:var(--dim);margin-bottom:18px">Upload Excel/CSV files. Retains the header from the 1st sheet, and pulls <strong>ONLY DATA</strong> from all subsequent sheets into one single master sheet without overlaps.</p>
+  <div id="cDrop" class="drop-zone" onclick="document.getElementById('cFile').click()">
+    <input type="file" id="cFile" accept=".xlsx, .xls, .csv" multiple hidden>
+    <div class="icon"><i class="fas fa-file-excel"></i></div>
+    <div style="font-weight:600;font-size:.85rem">Add Excel files</div>
+    <div style="font-size:.73rem;color:var(--dim);margin-top:4px">Accepts .xlsx, .xls, and .csv</div>
+  </div>
+  <div id="cList" style="margin-top:10px;display:flex;flex-direction:column;gap:5px"></div>
+  
+  <label class="opt-checkbox">
+    <input type="checkbox" id="cSumDuplicates">
+    Sum duplicates in Column A (Group and total values across all sheets)
+  </label>
+
+  <div id="cActions" class="hidden" style="margin-top:14px;display:flex;gap:7px;align-items:center">
+    <button class="btn btn-primary" onclick="doConsolidate()"><i class="fas fa-layer-group"></i> Merge Files</button>
+    <button class="btn btn-ghost" onclick="clearConsolidate()"><i class="fas fa-trash"></i> Clear</button>
+  </div>
+</div>
+
+<!-- ====== COMPILE WORKBOOK (SEPARATE TABS) ====== -->
+<div class="page narrow" id="pg-compile">
+  <h2 style="font-size:1.3rem;font-weight:800;letter-spacing:-.4px;margin-bottom:3px">Compile Workbook</h2>
+  <p style="font-size:.78rem;color:var(--dim);margin-bottom:18px">Upload Excel/CSV files. Every sheet from every file will be cloned and saved as a <strong>separate tab</strong> within a single master workbook.</p>
+  <div id="pDrop" class="drop-zone" onclick="document.getElementById('pFile').click()">
+    <input type="file" id="pFile" accept=".xlsx, .xls, .csv" multiple hidden>
+    <div class="icon"><i class="fas fa-folder-tree"></i></div>
+    <div style="font-weight:600;font-size:.85rem">Add Excel files</div>
+    <div style="font-size:.73rem;color:var(--dim);margin-top:4px">Accepts .xlsx, .xls, and .csv</div>
+  </div>
+  <div id="pList" style="margin-top:10px;display:flex;flex-direction:column;gap:5px"></div>
+  <div id="pActions" class="hidden" style="margin-top:14px;display:flex;gap:7px;align-items:center">
+    <button class="btn btn-primary" onclick="doCompile()"><i class="fas fa-folder-tree"></i> Compile Workbook</button>
+    <button class="btn btn-ghost" onclick="clearCompile()"><i class="fas fa-trash"></i> Clear</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+/* =========================================
+   State
+   ========================================= */
+let consolidateFiles = []; 
+let compileFiles = []; 
+
+/* =========================================
+   Navigation
+   ========================================= */
+function go(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('visible'));
+  document.querySelectorAll('.nav-btn[data-page]').forEach(b => b.classList.remove('active'));
+  const pg = document.getElementById('pg-' + id);
+  const btn = document.querySelector(`.nav-btn[data-page="${id}"]`);
+  if (pg) pg.classList.add('visible');
+  if (btn) btn.classList.add('active');
+}
+
+/* =========================================
+   Toast
+   ========================================= */
+function toast(msg, type='success') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  const ic = { success:'fa-check-circle', error:'fa-circle-xmark', warn:'fa-circle-exclamation' };
+  const cl = { success:'var(--accent)', error:'var(--red)', warn:'var(--amber)' };
+  t.innerHTML = `<i class="fas ${ic[type]||ic.success}" style="color:${cl[type]||cl.success};flex-shrink:0"></i><span>${msg}</span>`;
+  c.appendChild(t);
+  setTimeout(() => { t.style.animation = 'toastOut .2s ease forwards'; setTimeout(() => t.remove(), 200); }, 2800);
+}
+
+/* =========================================
+   Helpers
+   ========================================= */
+function fmtSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+function dlBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// Sanitizes sheet names to comply with Excel rules (max 31 chars, no illegal chars)
+function sanitizeSheetName(name) {
+  let cleanName = name.replace(/[\\\/\?\*\[\]:]/g, '_');
+  return cleanName.substring(0, 31);
+}
+
+/* =========================================
+   Drop zone helper
+   ========================================= */
+function initDrop(zoneId, inputId, handler) {
+  const zone = document.getElementById(zoneId);
+  const inp = document.getElementById(inputId);
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handler(e.dataTransfer.files); });
+  inp.addEventListener('change', () => { if (inp.files.length) { handler(inp.files); inp.value = ''; } });
+}
+
+/* =========================================
+   1. CONSOLIDATE DATA (VERTICAL STACK + OPTIONAL AGGREGATION)
+   ========================================= */
+function addConsolidate(files) {
+  for (const f of files) {
+    const validExt = ['.xlsx', '.xls', '.csv'];
+    const ext = '.' + f.name.split('.').pop().toLowerCase();
+    if (!validExt.includes(ext)) { toast(f.name + ' is not an Excel/CSV file', 'error'); continue; }
+    consolidateFiles.push(f);
+  } renderConsolidate();
+}
+
+function renderConsolidate() {
+  const el = document.getElementById('cList');
+  const act = document.getElementById('cActions');
+  el.innerHTML = '';
+  if (!consolidateFiles.length) { act.classList.add('hidden'); return; }
+  act.classList.remove('hidden');
+  consolidateFiles.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'file-item';
+    d.innerHTML = `<span class="name">${f.name}</span><span class="size">${fmtSize(f.size)}</span><button class="remove" onclick="removeConsolidateFile(${i})"><i class="fas fa-xmark"></i></button>`;
+    el.appendChild(d);
+  });
+}
+
+function removeConsolidateFile(i) { consolidateFiles.splice(i, 1); renderConsolidate(); }
+function clearConsolidate() { consolidateFiles = []; renderConsolidate(); }
+
+async function doConsolidate() {
+  if (consolidateFiles.length < 1) { toast('Add at least 1 file', 'warn'); return; }
+  toast('Scanning and stacking all sheets...', 'warn');
+  try {
+    const wb = XLSX.utils.book_new();
+    let combinedAOA = []; 
+    let isFirstSheetProcessed = false;
+    let totalRowsProcessed = 0;
+
+    for (let i = 0; i < consolidateFiles.length; i++) {
+      const f = consolidateFiles[i];
+      const ab = await f.arrayBuffer();
+      const fileWb = XLSX.read(ab, { type: 'array' });
+      
+      for (const sheetName of fileWb.SheetNames) {
+        const worksheet = fileWb.Sheets[sheetName];
+        if (!worksheet) continue;
+        
+        const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "", raw: false });
+        
+        if (sheetData.length === 0) continue;
+        
+        if (!isFirstSheetProcessed) {
+          combinedAOA = combinedAOA.concat(sheetData);
+          isFirstSheetProcessed = true;
+        } else {
+          if (sheetData.length > 1) {
+            combinedAOA = combinedAOA.concat(sheetData.slice(1));
+          }
+        }
+        totalRowsProcessed += sheetData.length;
+      }
+    }
+
+    if (combinedAOA.length === 0) { toast('No data found to merge', 'error'); return; }
+
+    // Check if aggregation by Column A is requested
+    const sumDuplicates = document.getElementById('cSumDuplicates').checked;
+    if (sumDuplicates) {
+      toast('Aggregating duplicates in Column A...', 'warn');
+      let aggregatedData = {};
+      let order = []; // Preserve first-seen order
+      let rawRows = []; // Rows with empty Col A are kept as is at the bottom
+      
+      // Assuming combinedAOA[0] is the header
+      const headers = combinedAOA[0];
+      
+      for (let r = 1; r < combinedAOA.length; r++) {
+        const row = combinedAOA[r];
+        const key = row[0] !== null && row[0] !== undefined ? String(row[0]).trim() : "";
+        
+        if (key === "") {
+          // Keep rows with empty Col A as-is
+          rawRows.push(row);
+          continue;
+        }
+        
+        if (!aggregatedData[key]) {
+          // Clone row and convert numbers where possible
+          let newRow = [...row];
+          for (let c = 1; c < newRow.length; c++) {
+            let val = parseFloat(newRow[c]);
+            if (!isNaN(val)) newRow[c] = val;
+          }
+          aggregatedData[key] = newRow;
+          order.push(key);
+        } else {
+          // Sum numeric values
+          for (let c = 1; c < row.length; c++) {
+            let val = parseFloat(row[c]);
+            if (!isNaN(val)) {
+              let currentVal = parseFloat(aggregatedData[key][c]);
+              if (isNaN(currentVal)) currentVal = 0;
+              aggregatedData[key][c] = currentVal + val;
+            }
+          }
+        }
+      }
+      
+      // Rebuild combinedAOA
+      combinedAOA = [headers];
+      for (const key of order) {
+        combinedAOA.push(aggregatedData[key]);
+      }
+      combinedAOA = combinedAOA.concat(rawRows);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(combinedAOA);
+    XLSX.utils.book_append_sheet(wb, ws, "Consolidated_Data");
+    
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    dlBlob(new Blob([wbout], { type: 'application/octet-stream' }), 'consolidated_data.xlsx');
+    toast(`Successfully processed ${totalRowsProcessed} rows!`);
+    
+  } catch (e) { 
+    toast('Consolidation failed: ' + e.message, 'error'); 
+    console.error(e);
+  }
+}
+initDrop('cDrop', 'cFile', addConsolidate);
+
+
+/* =========================================
+   2. COMPILE WORKBOOK (SEPARATE TABS)
+   ========================================= */
+function addCompile(files) {
+  for (const f of files) {
+    const validExt = ['.xlsx', '.xls', '.csv'];
+    const ext = '.' + f.name.split('.').pop().toLowerCase();
+    if (!validExt.includes(ext)) { toast(f.name + ' is not an Excel/CSV file', 'error'); continue; }
+    compileFiles.push(f);
+  } renderCompile();
+}
+
+function renderCompile() {
+  const el = document.getElementById('pList');
+  const act = document.getElementById('pActions');
+  el.innerHTML = '';
+  if (!compileFiles.length) { act.classList.add('hidden'); return; }
+  act.classList.remove('hidden');
+  compileFiles.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'file-item';
+    d.innerHTML = `<span class="name">${f.name}</span><span class="size">${fmtSize(f.size)}</span><button class="remove" onclick="removeCompileFile(${i})"><i class="fas fa-xmark"></i></button>`;
+    el.appendChild(d);
+  });
+}
+
+function removeCompileFile(i) { compileFiles.splice(i, 1); renderCompile(); }
+function clearCompile() { compileFiles = []; renderCompile(); }
+
+async function doCompile() {
+  if (compileFiles.length < 1) { toast('Add at least 1 file', 'warn'); return; }
+  toast('Compiling sheets into workbook...', 'warn');
+  try {
+    const wbOut = XLSX.utils.book_new();
+    let sheetsAdded = 0;
+
+    for (let i = 0; i < compileFiles.length; i++) {
+      const f = compileFiles[i];
+      const ab = await f.arrayBuffer();
+      const fileWb = XLSX.read(ab, { type: 'array' });
+      
+      const baseName = f.name.replace(/\.[^/.]+$/, "");
+      
+      for (const sheetName of fileWb.SheetNames) {
+        const worksheet = fileWb.Sheets[sheetName];
+        if (!worksheet) continue;
+        
+        let newSheetName = sanitizeSheetName(`${baseName}_${sheetName}`);
+        
+        let uniqueName = newSheetName;
+        let counter = 1;
+        while (wbOut.SheetNames.includes(uniqueName)) {
+          let suffix = `_${counter}`;
+          uniqueName = sanitizeSheetName(newSheetName.substring(0, 31 - suffix.length) + suffix);
+          counter++;
+        }
+
+        XLSX.utils.book_append_sheet(wbOut, worksheet, uniqueName);
+        sheetsAdded++;
+      }
+    }
+
+    if (sheetsAdded === 0) { toast('No sheets found to compile', 'error'); return; }
+
+    const wbout = XLSX.write(wbOut, { bookType: 'xlsx', type: 'array' });
+    dlBlob(new Blob([wbout], { type: 'application/octet-stream' }), 'compiled_workbook.xlsx');
+    toast(`Successfully compiled ${sheetsAdded} sheets into one workbook!`);
+    
+  } catch (e) { 
+    toast('Compilation failed: ' + e.message, 'error'); 
+    console.error(e);
+  }
+}
+initDrop('pDrop', 'pFile', addCompile);
+
+/* =========================================
+   Init
+   ========================================= */
+window.addEventListener('load', () => {
+  setTimeout(() => document.getElementById('loader').classList.add('done'), 350);
+});
+</script>
+</body>
+</html>
