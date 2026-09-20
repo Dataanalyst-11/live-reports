@@ -1,0 +1,68 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Conf&storein Flip Controller</title>
+
+<style>
+  body {
+    margin: 0;
+    background: black;
+  }
+
+  .frame {
+    width: 100vw;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+</style>
+</head>
+
+<body>
+
+<div id="frame1" class="frame">
+  <iframe id="iframe1"></iframe>
+</div>
+
+<div id="frame2" class="frame" style="display:none">
+  <iframe id="iframe2"></iframe>
+</div>
+
+<script>
+  // Flip interval in milliseconds
+  const FLIP_INTERVAL = 30000; // 30 seconds
+
+  // Get branch parameter from the URL
+  const url = new URL(window.location.href);
+  const branch = url.searchParams.get("branch") || "orgbranch-default";
+
+  // Build iframe URLs with branch preserved
+  const confURL = `confirmation.html?branch=${branch}`;
+  const storeinURL = `storein.html?branch=${branch}`;
+
+  // Load the dashboards
+  document.getElementById("iframe1").src = confURL;
+  document.getElementById("iframe2").src = storeinURL;
+
+  let toggle = 0;
+
+  setInterval(() => {
+    toggle = 1 - toggle;
+
+    document.getElementById("frame1").style.display = toggle ? "none" : "block";
+    document.getElementById("frame2").style.display = toggle ? "block" : "none";
+
+  }, FLIP_INTERVAL);
+</script>
+
+</body>
+</html>
