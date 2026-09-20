@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Riders Performance Dashboard</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      background: #745cfa;
+      text-align: center;
+      margin: 0;
+      padding: 12px;
+      color: white;
+      font-weight: bolder;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    #summaryBar {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    #summaryBar div {
+      flex: 1 1 200px;
+      margin: 5px;
+      padding: 15px;
+      border-radius: 8px;
+      font-weight: bold;
+      color: #fff;
+      text-align: center;
+    }
+
+    #totalAssigned { background: #007bff; }
+    #totalDelivered { background: #28a745; }
+    #totalCleared { background: #17a2b8; }
+    #pendingClearance { background: #dc3545; }
+
+    #scrollWrapper {
+      height: 82vh;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      border-left: 6px solid #007bff;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .card:hover {
+      transform: scale(1.02);
+    }
+
+    .good {
+      border-left-color: #008000 !important;
+      background: #e8f9e8;
+    }
+
+    .bad {
+      border-left-color: #cc0000 !important;
+      background: #ffe6e6;
+    }
+
+    .rider-name {
+      font-size: 20px;
+      font-weight: bolder;
+      margin-bottom: 10px;
+      color: #222;
+    }
+
+    .good .rider-name { color: #064b06; }
+    .bad .rider-name { color: #8b0000; }
+
+    .stat {
+      font-size: 15px;
+      font-weight: bolder;
+      margin: 5px 0;
+      padding: 5px 0;
+      border-bottom: 1px solid #eaeaea;
+    }
+
+    .stat:last-child {
+      border-bottom: none;
+    }
+
+    .loading {
+      text-align: center;
+      font-weight: bold;
+      margin-top: 20px;
+      color: #555;
+    }
+
+    .footer {
+      margin-top: 20px;
+      font-size: 14px;
+      text-align: center;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Riders Summary Reports</h1>
+
+  <div id="summaryBar">
+    <div id="totalAssigned">Total Assigned Invoices: 0</div>
+    <div id="totalDelivered">Delivered Today: 0</div>
+    <div id="totalCleared">Total Cleared Invoices: 0</div>
+    <div id="pendingClearance">Pending Clearance: 0</div>
+  </div>
+
+  <div id="scrollWrapper">
+    <div id="ridersContainer" class="grid">
+      <div class="loading">Loading riders data...</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Last updated: <span id="lastUpdated"></span>
+    <div>Designed and Managed by MIS.DPT</div>
+  </div>
+
+<script>
+  // Not a credential — proxy only accepts requests from this site's origin.
+  // The real API token lives ONLY in the Cloudflare worker's secrets.
+  window.API_CONFIG = {
+    API_URL: "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/pharma/"
+  };
+</script>
+
+<script>
+
+// ===================== API SETUP =====================
+
+let today = new Date();
+let yyyy = today.getFullYear();
+let mm = String(today.getMonth() + 1).padStart(2, '0');
+let dd = String(today.getDate()).padStart(2, '0');
+let formatted = `${yyyy}-${mm}-${dd}`;
+
+// Read branch ID dynamically from the URL, e.g. ?branch=orgbranch-12345
+      const urlParams = new URLSearchParams(window.location.search);
+      const branchId = urlParams.get('branch') || 'orgbranch-default'; // fallback if missing
+      // 🗺️ Optional: map of human-readable branch names
+       const branchNames = {
+       "orgbranch-683976e3994a072a600cbd7a": "Head Office",
+       "orgbranch-684558f576bd774c32f00d8e": "Naivasha",
+       "orgbranch-68455bea76bd774c32f031cc": "Kitengela",
+       "orgbranch-68458a4b76bd774c32f10527": "Githu Pharma",
+       "orgbranch-684593b176bd774c32f150c6": "Kawangware Wholesale",
+        "orgbranch-685001107d3c6f75c8c1d42e": "Karatina",
+       "orgbranch-685001217d3c6f75c8c1d491": "Meru",
+       "orgbranch-6850012f7d3c6f75c8c1d4f4": "Busia",
+       "orgbranch-685001387d3c6f75c8c1d557": "Mombasa Wholesale",
+       "orgbranch-685001457d3c6f75c8c1d5ba": "Kisii",
+       "orgbranch-685001557d3c6f75c8c1d61d": "Philton",
+       "orgbranch-6850015d7d3c6f75c8c1d680": "Kitui Wholesale",
+       "orgbranch-685001667d3c6f75c8c1d6e3": "Malindi",
+       "orgbranch-685001967d3c6f75c8c1d746": "Kericho",
+       "orgbranch-6850019e7d3c6f75c8c1d7a9": "Nakuru",
+        "orgbranch-685001a77d3c6f75c8c1d80c": "Kisumu",
+       "orgbranch-685001b17d3c6f75c8c1d86f": "Eldoret",
+       "orgbranch-685001c17d3c6f75c8c1d8d2": "Thika",
+       "orgbranch-685001ce7d3c6f75c8c1d935": "Voi",
+       "orgbranch-685001e27d3c6f75c8c1d998": "Kendia", 
+         "orgbranch-685001f37d3c6f75c8c1d9fb": "Kakamega",
+       "orgbranch-685001ff7d3c6f75c8c1da5e": "Bungoma",
+       "orgbranch-685002097d3c6f75c8c1dac1": "Makindu",
+       "orgbranch-685002137d3c6f75c8c1db4f": "Rongai Wholesale",
+       "orgbranch-685002247d3c6f75c8c1dc25": "Embu",
+       
+   // Add as many as you want
+  };
+
+// Use readable name if available
+const displayName = branchNames[branchId] || branchId;
+
+// 🧭 Display detected branch at top of dashboard
+const header = document.querySelector('h1');
+header.textContent += ` — [${displayName}]`;
+
+
+const API_URL = `${window.API_CONFIG.API_URL}/driver-dispatch-reports?&orgBranchId=${branchId}&startDate=${formatted}`;
+
+
+// ===================== SUMMARY UPDATE =====================
+
+function updateSummary(riders) {
+  let delivered = 0, cleared = 0, assigned = 0;
+
+  riders.forEach(r => {
+    delivered += r.ordersDelivered;
+    cleared += r.ordersCleared;
+    assigned += r.ordersAssigned;
+  });
+
+  const pending = assigned - cleared;
+
+  document.getElementById("totalAssigned").textContent = `Total Assigned Invoices: ${assigned}`;
+  document.getElementById("totalDelivered").textContent = `Delivered Today: ${delivered}`;
+  document.getElementById("totalCleared").textContent = `Total Cleared Invoices: ${cleared}`;
+  document.getElementById("pendingClearance").textContent = `Pending Clearance: ${pending}`;
+}
+
+
+// ===================== RENDER RIDERS =====================
+
+function renderRiders(riders) {
+  const container = document.getElementById("ridersContainer");
+  container.innerHTML = "";
+
+  riders.forEach(rider => {
+    const card = document.createElement("div");
+    card.className = "card " + (rider.ordersDelivered > rider.ordersCleared ? "bad" : "good");
+
+    card.innerHTML = `
+      <div class="rider-name">${rider.driverName}</div>
+      <div class="stat"><strong>Orders Assigned:</strong> ${rider.ordersAssigned}</div>
+      <div class="stat"><strong>Delivered:</strong> ${rider.ordersDelivered}</div>
+      <div class="stat"><strong>Cleared:</strong> ${rider.ordersCleared}</div>
+      <div class="stat"><strong>Failed:</strong> ${rider.ordersFailed}</div>
+      <div class="stat"><strong>Cancelled:</strong> ${rider.ordersCancelled}</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+
+// ===================== LOAD DATA (NO SCROLL RESET) =====================
+
+async function loadPerformanceData() {
+  const container = document.getElementById("scrollWrapper");
+  const savedScroll = container.scrollTop;
+
+  try {
+    const res = await fetch(API_URL, {
+      headers: {
+        
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!res.ok) throw new Error("API Error");
+
+    const json = await res.json();
+    const data = Array.isArray(json) ? json : json.data || [];
+
+    updateSummary(data);
+    renderRiders(data);
+
+    container.scrollTop = savedScroll;
+
+    document.getElementById("lastUpdated").textContent =
+      new Date().toLocaleTimeString();
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+
+// ===================== AUTO-SCROLL SYSTEM =====================
+
+let scrollInterval;
+let autoDirection = 1;  // 1 = down, -1 = up
+
+function startAutoScroll() {
+  const container = document.getElementById("scrollWrapper");
+  clearInterval(scrollInterval);
+
+  if (container.scrollHeight <= container.clientHeight) return;
+
+  const step = 1;
+  const speed = 40;
+
+  scrollInterval = setInterval(() => {
+    container.scrollTop += autoDirection * step;
+
+    if (container.scrollTop >= container.scrollHeight - container.clientHeight) {
+      autoDirection = 0;
+      setTimeout(() => autoDirection = -1, 2000);
+    }
+
+    if (container.scrollTop <= 0 && autoDirection === -1) {
+      autoDirection = 1;
+    }
+
+  }, speed);
+}
+
+
+// ===================== INITIALIZATION =====================
+
+document.addEventListener("DOMContentLoaded", () => {
+  startAutoScroll();
+});
+
+setInterval(loadPerformanceData, 30000);
+setInterval(startAutoScroll, 35000);
+
+loadPerformanceData();
+
+</script>
+
+</body>
+</html>
