@@ -1,0 +1,3134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Routewise Performance Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #e5e7eb; height: 100dvh; width: 100dvw; display: flex; flex-direction: column; overflow: hidden; }
+header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-bottom: 3px solid #ba9305; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; flex-shrink: 0; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-logo { width: 38px; height: 38px; background: #ba9305; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; color: #020617; flex-shrink: 0; }
+.header-title { font-size: 18px; font-weight: 700; color: #f8fafc; letter-spacing: -0.3px; }
+.header-subtitle { font-size: 11px; color: #64748b; font-weight: 400; margin-top: 1px; }
+.header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: relative; }
+.header-loading-overlay { position: absolute; inset: 0; background: rgba(15,23,42,.6); border-radius: 8px; display: flex; align-items: center; justify-content: center; z-index: 10; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.header-loading-overlay.active { opacity: 1; pointer-events: all; }
+.header-loading-overlay .mini-spinner { width: 20px; height: 20px; border: 3px solid #334155; border-top-color: #ba9305; border-radius: 50%; animation: spin .7s linear infinite; }
+.filter-select { position: relative; }
+.filter-select select { padding: 8px 36px 8px 14px; border-radius: 8px; border: 2px solid #334155; background: #1e293b; color: #f1f5f9; font-size: 13px; font-weight: 600; cursor: pointer; appearance: none; -webkit-appearance: none; transition: border-color .2s, box-shadow .2s, opacity .2s; outline: none; }
+.filter-select select:disabled { opacity: .5; cursor: not-allowed; }
+.filter-select select:hover:not(:disabled) { border-color: #ba9305; }
+.filter-select select:focus:not(:disabled) { border-color: #ba9305; box-shadow: 0 0 0 3px rgba(186,147,5,.15); }
+.filter-select::after { content: "\25BE"; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #ba9305; font-size: 16px; pointer-events: none; }
+.custom-date-range { display: flex; align-items: center; gap: 0; border-radius: 8px; border: 2px solid #334155; background: #1e293b; overflow: hidden; max-width: 0; opacity: 0; padding: 0; border-color: transparent; pointer-events: none; transition: border-color .2s, box-shadow .2s, opacity .3s, max-width .4s ease, padding .4s ease; }
+.custom-date-range.visible { max-width: 340px; opacity: 1; padding: 0; border-color: #334155; pointer-events: all; }
+.custom-date-range:focus-within:not(.disabled) { border-color: #ba9305; box-shadow: 0 0 0 3px rgba(186,147,5,.15); }
+.date-range-group { display: flex; align-items: center; gap: 0; padding: 2px 8px; position: relative; }
+.date-range-group + .date-range-group { border-left: 1px solid #334155; }
+.date-range-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: #ba9305; margin-right: 6px; white-space: nowrap; user-select: none; }
+.date-range-input-wrap { position: relative; display: flex; align-items: center; }
+.date-range-input-wrap input[type="date"] { padding: 6px 8px 6px 26px; border-radius: 6px; border: 1.5px solid #334155; background: #0f172a; color: #f1f5f9; font-size: 12px; font-weight: 600; outline: none; width: 110px; font-family: 'Segoe UI', Arial, sans-serif; transition: border-color .2s; }
+.date-range-input-wrap input[type="date"]:disabled { opacity: .4; cursor: not-allowed; }
+.date-range-input-wrap input[type="date"]:hover:not(:disabled) { border-color: #475569; }
+.date-range-input-wrap input[type="date"]:focus:not(:disabled) { border-color: #ba9305; }
+.date-range-input-wrap input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.7) sepia(1) saturate(3) hue-rotate(5deg); cursor: pointer; opacity: .7; transition: opacity .2s; }
+.date-icon { position: absolute; left: 7px; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; pointer-events: none; opacity: .5; }
+.date-icon svg { width: 100%; height: 100%; fill: #64748b; }
+.view-toggle { display: flex; background: #0f172a; border-radius: 8px; padding: 2px; border: 2px solid #334155; }
+.view-toggle button { padding: 6px 18px; border: none; background: transparent; color: #64748b; font-weight: 700; font-size: 12px; border-radius: 6px; cursor: pointer; transition: all .25s; white-space: nowrap; }
+.view-toggle button:hover:not(:disabled) { color: #94a3b8; }
+.view-toggle button.active { background: #ba9305; color: #020617; }
+#routeView, #branchView { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+#branchView { display: none; }
+.stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding: 16px 24px 0; flex-shrink: 0; }
+.branch-summary-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; padding: 16px 24px 0; flex-shrink: 0; }
+.stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 12px 16px; position: relative; overflow: hidden; transition: border-color .2s; }
+.stat-card:hover { border-color: #475569; }
+.stat-card::before { content: ""; position: absolute; top: 0; left: 0; width: 3px; height: 100%; border-radius: 3px 0 0 3px; }
+.stat-card:nth-child(1)::before { background: #22c55e; }
+.stat-card:nth-child(2)::before { background: #38bdf8; }
+.stat-card:nth-child(3)::before { background: #ef4444; }
+.branch-summary-row .stat-card:nth-child(4)::before { background: #f97316; }
+.stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; margin-bottom: 6px; }
+.stat-value { font-size: 22px; font-weight: 800; color: #f8fafc; line-height: 1; }
+.stat-sub { font-size: 11px; color: #94a3b8; margin-top: 4px; font-weight: 400; }
+.perf-high { color: #22c55e !important; }
+.perf-medium { color: #facc15 !important; }
+.perf-low { color: #ef4444 !important; }
+.branch-perf-section { padding: 12px 24px 0; flex-shrink: 0; }
+.branch-perf-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 12px 18px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.branch-perf-info { flex: 0 0 auto; min-width: 200px; }
+.branch-perf-info .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; margin-bottom: 2px; }
+.branch-perf-info .value { font-size: 28px; font-weight: 900; line-height: 1; }
+.branch-perf-info .detail { font-size: 12px; color: #94a3b8; margin-top: 4px; line-height: 1.4; }
+.branch-perf-info .detail .deficit { font-weight: 700; color: #ef4444; }
+.branch-perf-info .detail .surplus { font-weight: 700; color: #22c55e; }
+.perf-bar-wrap { flex: 1; min-width: 150px; }
+.perf-bar-track { width: 100%; height: 10px; background: #0f172a; border-radius: 99px; overflow: hidden; }
+.perf-bar-fill { height: 100%; border-radius: 99px; transition: width .8s cubic-bezier(.22,1,.36,1), background .4s; min-width: 0; }
+.perf-bar-labels { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; color: #475569; font-weight: 600; }
+.perf-bar-labels span.active-marker { color: #f8fafc; }
+.table-section { flex: 1; padding: 12px 24px 12px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
+.table-title { font-size: 14px; font-weight: 700; color: #f1f5f9; }
+.table-count { font-size: 12px; color: #64748b; background: #0f172a; padding: 4px 12px; border-radius: 99px; font-weight: 600; }
+.search-box { padding: 7px 14px 7px 32px; border-radius: 8px; border: 2px solid #334155; background: #0f172a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397, 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E") 12px center no-repeat; color: #f1f5f9; font-size: 13px; width: 260px; outline: none; transition: border-color .2s, box-shadow .2s; }
+.search-box::placeholder { color: #475569; }
+.search-box:focus { border-color: #ba9305; box-shadow: 0 0 0 3px rgba(186,147,5,.12); }
+.table-wrap { flex: 1; overflow-y: auto; border-radius: 10px; border: 1px solid #334155; background: #0f172a; scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+.table-wrap::-webkit-scrollbar { width: 6px; }
+.table-wrap::-webkit-scrollbar-track { background: transparent; }
+.table-wrap::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+thead th { position: sticky; top: 0; background: #1e293b; color: #94a3b8; text-transform: uppercase; font-size: 10px; letter-spacing: .8px; font-weight: 700; z-index: 2; padding: 10px 12px; border-bottom: 2px solid #334155; text-align: left; user-select: none; white-space: nowrap; }
+thead th.sortable { cursor: pointer; transition: color .2s, background .2s; }
+thead th.sortable:hover { color: #f1f5f9; background: #263348; }
+thead th.sortable.active-sort { color: #ba9305; }
+.sort-icon { display: inline-block; margin-left: 4px; font-size: 8px; opacity: .35; vertical-align: middle; transition: opacity .2s, transform .25s; }
+thead th.sortable:hover .sort-icon { opacity: .7; }
+thead th.sortable.active-sort .sort-icon { opacity: 1; }
+thead th.sortable.active-sort.sort-asc .sort-icon { transform: rotate(0deg); }
+thead th.sortable.active-sort.sort-desc .sort-icon { transform: rotate(180deg); }
+th:nth-child(1), td:nth-child(1) { width: 16%; }
+th:nth-child(2), td:nth-child(2) { width: 12%; }
+th:nth-child(3), td:nth-child(3) { width: 16%; }
+th:nth-child(4), td:nth-child(4) { width: 10%; text-align: center; }
+th:nth-child(5), td:nth-child(5) { width: 13%; text-align: right; }
+th:nth-child(6), td:nth-child(6) { width: 11%; text-align: right; }
+th:nth-child(7), td:nth-child(7) { width: 13%; text-align: right; }
+th:nth-child(8), td:nth-child(8) { width: 9%; text-align: center; }
+td { padding: 8px 12px; border-bottom: 1px solid #1e293b; vertical-align: middle; color: #cbd5e1; }
+tbody tr { transition: background .15s; }
+tbody tr:hover { background: rgba(30,41,59,.6); }
+tr.group-header td { background: #172033; color: #ba9305; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 10px 12px; border-top: 2px solid #334155; border-bottom: 1px solid #334155; }
+tr.group-header.branch-header td { background: #1e3a8a; color: #bfdbfe; font-size: 14px; border-top: 3px solid #3b82f6; border-bottom: 1px solid #1e40af; }
+tr.group-subtotal td { background: linear-gradient(90deg, #db2777 0%, #9333ea 100%); font-weight: 900; color: #fff; border-top: 2px solid #ec4899; border-bottom: 2px solid #7e22ce; text-transform: uppercase; letter-spacing: .5px; font-size: 14px; text-shadow: 1px 1px 2px rgba(0,0,0,.4); }
+tr.group-subtotal .sp-name { color: #fde047; font-weight: 900; font-size: 15px; }
+tr.group-subtotal .value-cell { color: #fff; font-weight: 900; font-size: 15px; }
+tr.group-subtotal .value-cell .kes { color: #fbcfe8; font-weight: 800; font-size: 12px; }
+tr.group-subtotal .pct-badge { background: #0f172a; color: #fff; font-weight: 900; border: 1px solid #fff; font-size: 12px; padding: 4px 10px; }
+tr.group-subtotal .status-dot { color: #fff; font-size: 12px; font-weight: 800; }
+.route-name { font-weight: 700; color: #f1f5f9; font-size: 12px; }
+.branch-cell { font-size: 11px; color: #94a3b8; }
+.sp-cell { font-size: 11px; color: #cbd5e1; font-weight: 600; }
+.pct-badge { display: inline-block; padding: 3px 8px; border-radius: 99px; font-weight: 800; font-size: 11px; min-width: 50px; text-align: center; }
+.pct-high { background: rgba(34,197,94,.12); color: #22c55e; }
+.pct-medium { background: rgba(250,204,21,.12); color: #facc15; }
+.pct-low { background: rgba(239,68,68,.12); color: #ef4444; }
+.value-cell { font-weight: 700; color: #e2e8f0; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.value-cell .kes { font-weight: 400; color: #64748b; font-size: 10px; margin-right: 2px; }
+.status-dot { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.status-dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.status-on-track::before { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.status-on-track { color: #22c55e; }
+.status-at-risk::before { background: #facc15; box-shadow: 0 0 6px #facc15; }
+.status-at-risk { color: #facc15; }
+.status-below::before { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+.status-below { color: #ef4444; }
+.no-data-row td { text-align: center; padding: 40px 20px; color: #475569; font-size: 14px; }
+.loading-row td { text-align: center; padding: 40px 20px; color: #64748b; font-size: 14px; }
+.loading-spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid #334155; border-top-color: #ba9305; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 10px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sort-hint { font-size: 10px; color: #475569; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.branch-grid-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 12px; }
+.branch-grid-wrap { flex: 1; padding: 0 24px 16px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+.branch-grid-wrap::-webkit-scrollbar { width: 6px; }
+.branch-grid-wrap::-webkit-scrollbar-track { background: transparent; }
+.branch-grid-wrap::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
+.branch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.b-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px 18px 22px; position: relative; overflow: hidden; transition: transform .15s, border-color .2s; }
+.b-card:hover { transform: translateY(-2px); border-color: #475569; }
+.b-card::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; border-radius: 4px 0 0 4px; }
+.b-card.tier-high::before { background: #22c55e; }
+.b-card.tier-medium::before { background: #facc15; }
+.b-card.tier-low::before { background: #ef4444; }
+.b-card.tier-none { opacity: .35; border-style: dashed; }
+.b-card.tier-none::before { background: #475569; }
+.b-card-name { font-size: 15px; text-transform: uppercase; letter-spacing: 1.2px; color: #e2e8f0; font-weight: 800; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-card-pct { font-size: 28px; font-weight: 900; line-height: 1; color: #f8fafc; margin-bottom: 4px; }
+.b-card-routes { font-size: 11px; color: #38bdf8; font-weight: 700; margin-bottom: 6px; }
+.b-card-detail { font-size: 12px; color: #94a3b8; line-height: 1.4; }
+.b-card-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 4px; background: #0f172a; }
+.b-card-bar-fill { height: 100%; border-radius: 0 0 14px 0; transition: width .8s ease; }
+.bar-high { background: #22c55e; }
+.bar-medium { background: #facc15; }
+.bar-low { background: #ef4444; }
+.bar-none { background: #475569; }
+.b-card.hidden { display: none; }
+.no-branch-data { text-align: center; padding: 40px 20px; color: #475569; font-size: 14px; grid-column: 1/-1; }
+footer { text-align: center; padding: 8px; font-size: 11px; background: #0f172a; color: #475569; border-top: 1px solid #1e293b; flex-shrink: 0; }
+footer span.highlight { color: #ba9305; font-weight: 600; }
+.toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; border: 1px solid #334155; border-left: 4px solid #ef4444; color: #f1f5f9; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 32px rgba(0,0,0,.4); z-index: 999; transform: translateX(120%); transition: transform .35s cubic-bezier(.22,1,.36,1); max-width: 380px; }
+.toast.show { transform: translateX(0); }
+.toast.toast-warn { border-left-color: #f59e0b; }
+.toast.toast-retry { border-left-color: #38bdf8; }
+.toast.toast-success { border-left-color: #22c55e; }
+.ovm-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; border: 2px solid #334155; background: #1e293b; color: #f1f5f9; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .2s; position: relative; }
+.ovm-btn:hover:not(:disabled) { border-color: #ba9305; color: #ba9305; }
+.ovm-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ovm-btn svg { width: 14px; height: 14px; }
+.ovm-count { background: #ba9305; color: #020617; font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 99px; min-width: 18px; text-align: center; }
+.ovm-count.zero { background: #334155; color: #64748b; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.modal-overlay.active { opacity: 1; pointer-events: all; }
+.modal { background: #1e293b; border: 1px solid #334155; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.6); width: 100%; max-width: 1100px; max-height: 90vh; display: flex; flex-direction: column; transform: scale(.96); transition: transform .25s; }
+.modal-overlay.active .modal { transform: scale(1); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid #334155; flex-shrink: 0; gap: 12px; }
+.modal-title { font-size: 17px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 10px; }
+.modal-title .badge { background: #ba9305; color: #020617; font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 900; }
+.modal-close { background: transparent; border: none; color: #64748b; cursor: pointer; padding: 6px; border-radius: 6px; transition: all .2s; display: flex; align-items: center; justify-content: center; }
+.modal-close:hover { color: #ef4444; background: rgba(239,68,68,.1); }
+.modal-close svg { width: 20px; height: 20px; }
+.modal-body { flex: 1; overflow-y: auto; padding: 18px 24px; scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+.modal-body::-webkit-scrollbar { width: 6px; }
+.modal-body::-webkit-scrollbar-track { background: transparent; }
+.modal-body::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
+.modal-footer { padding: 14px 24px; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; flex-shrink: 0; }
+.modal-footer-info { font-size: 11px; color: #64748b; }
+.modal-footer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { padding: 8px 16px; border-radius: 8px; border: 2px solid #334155; background: #0f172a; color: #f1f5f9; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 6ps; }
+.btn:hover:not(:disabled) { border-color: #ba9305; color: #ba9305; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn svg { width: 13px; height: 13px; }
+.btn.btn-primary { background: #ba9305; color: #020617; border-color: #ba9305; }
+.btn.btn-primary:hover:not(:disabled) { background: #d4a820; border-color: #d4a820; color: #020617; }
+.btn.btn-danger { color: #ef4444; border-color: #7f1d1d; }
+.btn.btn-danger:hover:not(:disabled) { background: rgba(239,68,68,.1); border-color: #ef4444; color: #ef4444; }
+.btn.btn-success { color: #22c55e; border-color: #14532d; }
+.btn.btn-success:hover:not(:disabled) { background: rgba(34,197,94,.1); border-color: #22c55e; color: #22c55e; }
+.ovm-toolbar { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+.ovm-search { flex: 1; min-width: 200px; padding: 8px 14px 8px 32px; border-radius: 8px; border: 2px solid #334155; background: #0f172a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397, 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E") 12px center no-repeat; color: #f1f5f9; font-size: 13px; outline: none; transition: border-color .2s; }
+.ovm-search:focus { border-color: #ba9305; }
+.ovm-stats { display: flex; gap: 18px; font-size: 11px; color: #94a3b8; padding: 0 4px 12px; flex-wrap: wrap; }
+.ovm-stat { display: flex; align-items: center; gap: 6px; }
+.ovm-stat strong { color: #f8fafc; font-size: 14px; font-weight: 800; }
+.ovm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ovm-table thead th { position: sticky; top: 0; background: #0f172a; color: #94a3b8; text-transform: uppercase; font-size: 10px; letter-spacing: .6px; font-weight: 700; padding: 10px; border-bottom: 1px solid #334155; text-align: left; z-index: 2; }
+.ovm-table tbody td { padding: 9px 10px; border-bottom: 1px solid #1e293b; color: #cbd5e1; vertical-align: middle; }
+.ovm-table tbody tr:hover { background: rgba(30,41,59,.5); }
+.ovm-route-name { font-weight: 700; color: #f1f5f9; font-size: 12px; }
+.ovm-field-tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
+.ovm-field-tag.sp { background: rgba(56,189,248,.15); color: #38bdf8; }
+.ovm-field-tag.mainRoute { background: rgba(168,85,247,.15); color: #a855f7; }
+.ovm-field-tag.branch { background: rgba(34,197,94,.15); color: #22c55e; }
+.ovm-value-old { color: #64748b; text-decoration: line-through; font-size: 11px; }
+.ovm-value-new { color: #f8fafc; font-weight: 700; }
+.ovm-arrow { color: #ba9305; font-size: 10px; margin: 0 5px; }
+.ovm-actions { display: flex; gap: 4px; }
+.ovm-action-btn { background: transparent; border: 1px solid #334155; color: #94a3b8; cursor: pointer; padding: 4px 7px; border-radius: 5px; transition: all .15s; display: inline-flex; align-items: center; }
+.ovm-action-btn:hover { color: #ba9305; border-color: #ba9305; }
+.ovm-action-btn.danger:hover { color: #ef4444; border-color: #ef4444; }
+.ovm-action-btn svg { width: 12px; height: 12px; }
+.ovm-empty { text-align: center; padding: 60px 20px; color: #475569; }
+.ovm-empty svg { width: 48px; height: 48px; opacity: .3; margin-bottom: 12px; }
+.ovm-empty .title { font-size: 16px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
+.ovm-empty .sub { font-size: 12px; color: #475569; }
+.ovm-timestamp { font-size: 10px; color: #475569; white-space: nowrap; }
+.edit-route-form { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; }
+.edit-route-route-name { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 16px; }
+.edit-route-route-name .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #ba9305; font-weight: 700; margin-bottom: 4px; }
+.edit-route-route-name .val { font-size: 16px; font-weight: 800; color: #f8fafc; }
+.edit-field-group { display: flex; flex-direction: column; gap: 6px; }
+.edit-field-label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: #94a3b8; font-weight: 700; display: flex; align-items: center; justify-content: space-between; }
+.edit-field-label .override-flag { font-size: 9px; background: #ba9305; color: #020617; padding: 1px 6px; border-radius: 99px; font-weight: 900; }
+.edit-field-label .original-val { font-size: 10px; color: #64748b; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.edit-field-input { padding: 9px 12px; border-radius: 7px; border: 2px solid #334155; background: #0f172a; color: #f1f5f9; font-size: 13px; font-weight: 600; outline: none; transition: border-color .2s, box-shadow .2s; font-family: 'Segoe UI', Arial, sans-serif; }
+.edit-field-input:focus { border-color: #ba9305; box-shadow: 0 0 0 3px rgba(186,147,5,.15); }
+.edit-field-input.has-override { border-color: #ba9305; background: rgba(186,147,5,.05); }
+.edit-field-reset { background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 10px; padding: 2px 6px; border-radius: 4px; transition: color .15s; }
+.edit-field-reset:hover { color: #ef4444; }
+@media(max-width:1100px) {
+  .branch-summary-row { grid-template-columns: 1fr 1fr; }
+  th:nth-child(2), td:nth-child(2), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6) { display: none; }
+  th:nth-child(1), td:nth-child(1) { width: 25%; }
+  th:nth-child(3), td:nth-child(3) { width: 30%; }
+  th:nth-child(4), td:nth-child(4) { width: 20%; text-align: center; }
+  th:nth-child(7), td:nth-child(7) { width: 25%; text-align: right; }
+}
+@media(max-width:900px) {
+  th:nth-child(3), td:nth-child(3), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6) { display: none; }
+  th:nth-child(1), td:nth-child(1) { width: 30%; }
+  th:nth-child(2), td:nth-child(2) { width: 20%; }
+  th:nth-child(4), td:nth-child(4) { width: 15%; text-align: center; }
+  th:nth-child(7), td:nth-child(7) { width: 35%; text-align: right; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <div class="header-logo">RW</div>
+    <div>
+      <div class="header-title" id="headerTitle">Routewise Performance Dashboard</div>
+      <div class="header-subtitle" id="headerSubtitle">Management Overview — Master Template Clustering</div>
+    </div>
+  </div>
+  <div class="header-right" id="headerRight">
+    <div class="header-loading-overlay" id="headerLoading"><div class="mini-spinner"></div></div>
+    <div class="filter-select date-selector">
+      <select id="dateSelect">
+        <option value="today" selected>Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="7days">Last 7 Days</option>
+        <option value="30days">Last 30 Days</option>
+        <option value="90days">Last 90 Days</option>
+        <option value="custom">Custom Range</option>
+      </select>
+    </div>
+    <div class="custom-date-range" id="customDateRange">
+      <div class="date-range-group">
+        <span class="date-range-label">From</span>
+        <div class="date-range-input-wrap">
+          <span class="date-icon"><svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg></span>
+          <input type="date" id="dateFrom">
+        </div>
+      </div>
+      <div class="date-range-group">
+        <span class="date-range-label">To</span>
+        <div class="date-range-input-wrap">
+          <span class="date-icon"><svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg></span>
+          <input type="date" id="dateTo">
+        </div>
+      </div>
+    </div>
+    <div class="view-toggle">
+      <button id="btnRoutes" class="active" onclick="switchView('routes')">Routes</button>
+      <button id="btnBranches" onclick="switchView('branches')">Branches</button>
+    </div>
+    <button class="ovm-btn" id="ovmBtn" onclick="openOverrideManager()" title="Override Manager">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+      <span>Overrides</span>
+      <span class="ovm-count zero" id="ovmCount">0</span>
+    </button>
+    <div class="filter-select branch-selector" id="branchSelectorWrap">
+      <select id="branchSelect">
+        <option value="">All Branches</option>
+      </select>
+    </div>
+  </div>
+</header>
+<div id="routeView">
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Customer Orders</div>
+      <div class="stat-value" id="statOrders">—</div>
+      <div class="stat-sub" id="statOrdersSub">across all routes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Routes</div>
+      <div class="stat-value" id="statActive">—</div>
+      <div class="stat-sub" id="statActiveSub">including zero sales</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label" id="deficitLabel">Sales Deficit</div>
+      <div class="stat-value" id="statDeficit">—</div>
+      <div class="stat-sub" id="statDeficitSub">vs branch target</div>
+    </div>
+  </div>
+  <div class="branch-perf-section">
+    <div class="branch-perf-card">
+      <div class="branch-perf-info">
+        <div class="label">Branch Performance vs Target</div>
+        <div class="value" id="branchPerfValue">—</div>
+        <div class="detail" id="branchPerfDetail">loading...</div>
+      </div>
+      <div class="perf-bar-wrap">
+        <div class="perf-bar-track">
+          <div class="perf-bar-fill" id="branchPerfBar" style="width:0%;"></div>
+        </div>
+        <div class="perf-bar-labels">
+          <span>0%</span>
+          <span id="marker50">50%</span>
+          <span>80%</span>
+          <span>100%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="table-section">
+    <div class="table-header">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span class="table-title">Route Performance (Clustered by Sales Person)</span>
+        <span class="table-count" id="tableCount">0 routes</span>
+        <span class="sort-hint" id="sortHint">Click column headers to sort</span>
+      </div>
+      <input type="text" class="search-box" id="searchBox" placeholder="Search route, branch, or sales person...">
+    </div>
+    <div class="table-wrap" id="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable" data-sort="name">BRANCHES <span class="sort-icon">▲</span></th>
+            <th class="sortable" data-sort="branch">MAINROUTE <span class="sort-icon">▲</span></th>
+            <th class="sortable" data-sort="sp">SALES PERSON <span class="sort-icon">▲</span></th>
+            <th class="sortable" data-sort="score" style="text-align:center;">ACHIEVEMENT <span class="sort-icon">▲</span></th>
+            <th class="sortable" data-sort="target" style="text-align:right;"><span id="thTargetLabel">RANGE TARGET</span> <span class="sort-icon">▲</span></th>
+            <th class="sortable" data-sort="daily" style="text-align:right;">DAILY TARGET <span class="sort-icon">▲</span></th>
+            <th class="sortable active-sort sort-desc" data-sort="actual" style="text-align:right;">ACTUAL SALES <span class="sort-icon">▲</span></th>
+            <th style="text-align:center;">STATUS</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr class="loading-row"><td colspan="8"><span class="loading-spinner"></span> Loading route data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div id="branchView">
+  <div class="branch-summary-row">
+    <div class="stat-card">
+      <div class="stat-label">Overall Performance</div>
+      <div class="stat-value" id="bsOverallPct">—</div>
+      <div class="stat-sub">aggregated all routes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Net Sales</div>
+      <div class="stat-value" id="bsTotalSales">—</div>
+      <div class="stat-sub">across all routes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Routes Achieved</div>
+      <div class="stat-value perf-high" id="bsOnTrack">—</div>
+      <div class="stat-sub" id="bsOnTrackSub">at 80% or above</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Actual Score (Raw)</div>
+      <div class="stat-value" id="bsRawPerf">—</div>
+      <div class="stat-sub" id="bsRawPerfSub">against original targets</div>
+    </div>
+  </div>
+  <div class="branch-grid-wrap">
+    <div class="branch-grid-header">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <span class="table-title">All Branches</span>
+        <span class="table-count" id="branchCount">0 branches</span>
+      </div>
+      <input type="text" class="search-box" id="branchSearchBox" placeholder="Search branch...">
+    </div>
+    <div class="branch-grid" id="branchGrid">
+      <div class="no-branch-data">Loading branch data...</div>
+    </div>
+  </div>
+</div>
+<footer>Last updated: <span class="highlight" id="lastUpdated">—</span>&nbsp;|&nbsp;Auto-refreshes every 10 mins (background)&nbsp;|&nbsp;Designed and Managed by <span class="highlight">MIS.DPT</span></footer>
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="ovmModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ba9305" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"></path>
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+        </svg>
+        Override Manager<span class="badge" id="ovmModalCount">0</span>
+      </div>
+      <button class="modal-close" onclick="closeOverrideManager()" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="ovm-toolbar">
+        <input type="text" class="ovm-search" id="ovmSearch" placeholder="Search routes, sales persons, branches...">
+      </div>
+      <div class="ovm-stats" id="ovmStats"></div>
+      <div id="ovmListWrap" style="max-height: 55vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #334155 transparent;">
+        <table class="ovm-table">
+          <thead>
+            <tr>
+              <th style="width: 22%;">Route</th>
+              <th style="width: 10%;">Field</th>
+              <th style="width: 40%;">Change</th>
+              <th style="width: 14%;">Modified</th>
+              <th style="width: 14%; text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ovmTableBody"></tbody>
+        </table>
+        <div id="ovmEmpty" class="ovm-empty" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M8 12h8"></path>
+          </svg>
+          <div class="title">No Overrides Yet</div>
+          <div class="sub">Double-click any route in the table to override its Main Route, Sales Person, or Branch.<br>Overrides persist in localStorage and survive refresh/restart.</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-info" id="ovmFooterInfo">Overrides persist in localStorage and survive refresh.</div>
+      <div class="modal-footer-actions">
+        <button class="btn btn-success" id="ovmExportBtn" onclick="exportOverridesJSON()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Export JSON
+        </button>
+        <button class="btn btn-primary" id="ovmGenJsBtn" onclick="generateUpdatedJS()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          Generate JS
+        </button>
+        <button class="btn btn-danger" id="ovmClearBtn" onclick="confirmClearAll()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Clear All
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="editRouteModal">
+  <div class="modal" style="max-width: 520px;">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ba9305" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+        Edit Route Assignment
+      </div>
+      <button class="modal-close" onclick="closeEditRouteModal()" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="edit-route-form">
+        <div class="edit-route-route-name">
+          <div class="lbl">Route Name</div>
+          <div class="val" id="editRouteNameDisplay">—</div>
+        </div>
+        <div class="edit-field-group">
+          <label class="edit-field-label" for="editMainRoute">Main Route<span id="editMainRouteFlag"></span></label>
+          <input type="text" class="edit-field-input" id="editMainRoute" autocomplete="off">
+          <span class="original-val" id="editMainRouteOriginal" style="font-size: 10px; color: #64748b;"></span>
+        </div>
+        <div class="edit-field-group">
+          <label class="edit-field-label" for="editSP">Sales Person<span id="editSPFlag"></span></label>
+          <input type="text" class="edit-field-input" id="editSP" autocomplete="off">
+          <span class="original-val" id="editSPOriginal" style="font-size: 10px; color: #64748b;"></span>
+        </div>
+        <div class="edit-field-group">
+          <label class="edit-field-label" for="editBranch">Branch<span id="editBranchFlag"></span></label>
+          <input type="text" class="edit-field-input" id="editBranch" autocomplete="off">
+          <span class="original-val" id="editBranchOriginal" style="font-size: 10px; color: #64748b;"></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-info">Original values reflect the source masterTemplate.</div>
+      <div class="modal-footer-actions">
+        <button class="btn" onclick="closeEditRouteModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveRouteEdits()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Not a credential — proxy only accepts requests from this site's origin.
+  // The real API token lives ONLY in the Cloudflare worker's secrets.
+  window.API_CONFIG = {
+    API_URL: "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/pharma/"
+  };
+</script>
+  
+<script>
+/* 
+  MASTER TEMPLATE SAMPLE:
+  I have truncated this heavily so the code doesn't break.
+  Replace the object below with your full master template.
+  Ensure the format is exactly: "ROUTE_NAME": ["MAIN_ROUTE", "SALES_PERSON", "BRANCH_CODE"]
+*/
+const masterTemplate = {
+  "TAVETA": ["TAVETA", "NO FCRO", "VOI"],
+  "MWATATE": ["MWATATE", "NO FCRO", "VOI"],
+  "NJUKINI": ["TAVETA", "NO FCRO", "VOI"],
+  "WUNDANYI": ["WUNDANYI", "NO FCRO", "VOI"],
+  "BURA - VOI": ["BURA", "NO FCRO", "VOI"],
+  "VOI CBD": ["VOI", "CECILIA KIOKO", "VOI"],
+  "MACKINON": ["VOI", "CECILIA KIOKO", "VOI"],
+  "MAUNGU": ["VOI", "CECILIA KIOKO", "VOI"],
+  "SAMBURU": ["SAMBURU", "CECILIA KIOKO", "VOI"],
+  "TARU": ["SAMBURU", "CECILIA KIOKO", "VOI"],
+  "JOGOO ROAD": ["Jogoo Road", "VIVIAN ACHIENG", "HEAD OFFICE"],
+  "DONHOLM": ["Donholm", "TRACY AWITI", "HEAD OFFICE"],
+  "BURUBURU": ["Buruburu", "VIVIAN ACHIENG", "HEAD OFFICE"],
+  "GIKOMBA": ["Gikomba", "VIVIAN ACHIENG", "HEAD OFFICE"],
+  "SHAURI MOYO": ["Shauri Moyo", "VIVIAN ACHIENG", "HEAD OFFICE"],
+  "UMOJA": ["UMOJA", "TRACY AWITI", "HEAD OFFICE"],
+  "KARIOBANGI SOUTH": ["KARIOBANGI SOUTH", "YVONNE MONYENCHE", "HEAD OFFICE"],
+  "MOWLEM - HEAD OFFICE": ["Mowlem", "YVONNE MONYENCHE", "HEAD OFFICE"],
+  "KIAMBIO": ["KIAMBIO", "YVONNE MONYENCHE", "HEAD OFFICE"],
+  "MATHARE": ["Mathare", "EMMANUEL OBIRI", "HEAD OFFICE"],
+  "HURUMA - HEAD OFFICE": ["HURUMA", "EMMANUEL OBIRI", "HEAD OFFICE"],
+  "KIAMAIKO": ["KIAMAIKO", "EMMANUEL OBIRI", "HEAD OFFICE"],
+  "MACHAKOS - HQ": ["Machakos-HQ", "EVERLINE", "HEAD OFFICE"],
+  "KIKIMA-HQ": ["KIKIMA", "EVERLINE", "HEAD OFFICE"],
+  "UTAWALA": ["Utawala", "MAGDALENE MBETE", "HEAD OFFICE"],
+  "TASSIA": ["Tassia", "MAGDALENE MBETE", "HEAD OFFICE"],
+  "EMBAKASI": ["Embakasi", "MAGDALENE MBETE", "HEAD OFFICE"],
+  "FEDHA": ["Fedha", "MAGDALENE MBETE", "HEAD OFFICE"],
+  "PIPELINE - HQ": ["Pipeline", "LILIAN MUENI", "HEAD OFFICE"],
+  "IMARA DAIMA": ["Imara Daima", "LILIAN MUENI", "HEAD OFFICE"],
+  "KWARE - HQ": ["Pipeline", "LILIAN MUENI", "HEAD OFFICE"],
+  "SOUTH B": ["South B", "JOASH KIAGE", "HEAD OFFICE"],
+  "REUBEN": ["Reuben", "JOASH KIAGE", "HEAD OFFICE"],
+  "NJENGA": ["Njenga", "JOASH KIAGE", "HEAD OFFICE"],
+  "LUNGALUNGA - HQ": ["Lunga Lunga", "JOASH KIAGE", "HEAD OFFICE"],
+  "NAIROBI CBD": ["CBD", "AMMEAL MICHEKA", "HEAD OFFICE"],
+  "WESTLANDS - HQ": ["WESTLANDS", "AMMEAL MICHEKA", "HEAD OFFICE"],
+  "NGARA": ["Ngara", "AMMEAL MICHEKA", "HEAD OFFICE"],
+  "PARKLANDS": ["Parklands", "AMMEAL MICHEKA", "HEAD OFFICE"],
+  "EASTLEIGH": ["Eastleigh", "AMMEAL MICHEKA", "HEAD OFFICE"],
+  "PANGANI": ["Pangani", "AMMEAL MICHEKA", "HEAD OFFICE"],
+  "MLANGO KUBWA": ["Mlango Kubwa", "AMMEAL MICHEKA", "HEAD OFFICE"],
+  "RUAI": ["Ruai", "NANCY MAMBOLEO", "HEAD OFFICE"],
+  "KAMULU": ["Kamulu", "NANCY MAMBOLEO", "HEAD OFFICE"],
+  "JOSKA": ["Joska", "NANCY MAMBOLEO", "HEAD OFFICE"],
+  "TALA": ["Tala", "NANCY MAMBOLEO", "HEAD OFFICE"],
+  "KANGUNDO": ["Kangundo", "NANCY MAMBOLEO", "HEAD OFFICE"],
+  "MALAA": ["Malaa", "NANCY MAMBOLEO", "HEAD OFFICE"],
+  "DANDORA": ["Dandora", "STANLEY MBOYA", "HEAD OFFICE"],
+  "BABA DOGO": ["Baba Dogo", "STANLEY MBOYA", "HEAD OFFICE"],
+  "LUCKY SUMMER": ["LuckY Summer", "STANLEY MBOYA", "HEAD OFFICE"],
+  "KARIOBANGI NORTH": ["Kariobangi", "STANLEY MBOYA", "HEAD OFFICE"],
+  "NGOMONGO - HQ": ["Ngomongo", "STANLEY MBOYA", "HEAD OFFICE"],
+  "KAYOLE - HQ": ["Kayole", "AMOS MONGÁRE & EFFIE OYOO", "HEAD OFFICE"],
+  "SOWETO - HQ": ["Soweto", "AMOS MONGÁRE & EFFIE OYOO", "HEAD OFFICE"],
+  "BEE CENTER": ["Kayole", "BERYL ONYAPIDI", "HEAD OFFICE"],
+  "KOMAROCKS": ["Komarocks", "BERYL ONYAPIDI", "HEAD OFFICE"],
+  "SAIKA": ["Saika", "BERYL ONYAPIDI", "HEAD OFFICE"],
+  "CHOKAA": ["Chokaa", "BERYL ONYAPIDI", "HEAD OFFICE"],
+  "KAYOLE JUNCTION": ["Kayole", "BERYL ONYAPIDI", "HEAD OFFICE"],
+  "OBAMA": ["Obama", "BERYL ONYAPIDI", "HEAD OFFICE"],
+  "NJIRU": ["Njiru", "BERYL ONYAPIDI", "HEAD OFFICE"],
+  "MATOPENI": ["Matopeni", "BERYL ONYAPIDI", "HEAD OFFICE"],
+  "KIMILILI": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "CHWELE": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "KAMKUYWA": ["KAMKUYWA", "MARION NELIMA", "BUNGOMA"],
+  "KAPSOKWONY": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "SIRISIA": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "KAPTAMA": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "KIPSIGON": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "CHEPTAIS": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "NAMWELA": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "KOPSIRO": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "KUYWA": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "KAPKATENY": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "LWAKHAKHA": ["LWAKHAKHA", "MARION NELIMA", "BUNGOMA"],
+  "MISIKHU": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "CHEPYUK": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "CHEBUKUBE": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "LUGULU": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "KONGIT": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "WESTERN - BUNGOMA": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "LWANDANYI": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "CHEBUKWABI": ["KIMILILI", "MARION NELIMA", "BUNGOMA"],
+  "BUNGOMA CBD": ["BUNGOMA", "TESLYNE SIMIYU", "BUNGOMA"],
+  "WEBUYE": ["WEBUYE", "TESLYNE SIMIYU", "BUNGOMA"],
+  "KANDUYI": ["BUNGOMA", "TESLYNE SIMIYU", "BUNGOMA"],
+  "BUKEMBE": ["WEBUYE", "TESLYNE SIMIYU", "BUNGOMA"],
+  "HARAMBEE": ["BUNGOMA", "TESLYNE SIMIYU", "BUNGOMA"],
+  "KIBABII": ["BUNGOMA", "TESLYNE SIMIYU", "BUNGOMA"],
+  "MUSAMBA": ["HARAMBEE", "TESLYNE SIMIYU", "BUNGOMA"],
+  "BUMULA": ["BUNGOMA", "TESLYNE SIMIYU", "BUNGOMA"],
+  "MAYANJA": ["KIMAETI", "TESLYNE SIMIYU", "BUNGOMA"],
+  "NALONDO": ["BUNGOMA", "TESLYNE SIMIYU", "BUNGOMA"],
+  "KABULA": ["KABULA", "TESLYNE SIMIYU", "BUNGOMA"],
+  "KABUCHAI": ["BUNGOMA", "TESLYNE SIMIYU", "BUNGOMA"],
+  "MATEKA": ["BUNGOMA", "TESLYNE SIMIYU", "BUNGOMA"],
+  "BUSIA CBD": ["BUSIA", "GIDEON RAGAMA", "BUSIA"],
+  "NAMBALE": ["NAMBALE", "GIDEON RAGAMA", "BUSIA"],
+  "MUNDIKA": ["BUSIA", "GIDEON RAGAMA", "BUSIA"],
+  "MUNGATSI": ["MATUNGU", "GIDEON RAGAMA", "BUSIA"],
+  "ALUPE": ["LUKOLIS", "GIDEON RAGAMA", "BUSIA"],
+  "MATAYOS": ["MATAYOS", "GIDEON RAGAMA", "BUSIA"],
+  "MALANGA - BUSIA": ["BUSIA", "GIDEON RAGAMA", "BUSIA"],
+  "BUHUI": ["BUSIA", "GIDEON RAGAMA", "BUSIA"],
+  "LUBANGA": ["NAMBALE", "GIDEON RAGAMA", "BUSIA"],
+  "PORT VICTORIA": ["PORT VICTORIA", "AARON OMONG'IN", "BUSIA"],
+  "OGALO": ["PORT VICTORIA", "AARON OMONG'IN", "BUSIA"],
+  "BUDALANGI": ["PORT VICTORIA", "AARON OMONG'IN", "BUSIA"],
+  "BUTULA": ["PORT VICTORIA", "AARON OMONG'IN", "BUSIA"],
+  "BUMALA": ["PORT VICTORIA", "AARON OMONG'IN", "BUSIA"],
+  "FUNYULA": ["PORT VICTORIA", "AARON OMONG'IN", "BUSIA"],
+  "SIO PORT": ["PORT VICTORIA", "AARON OMONG'IN", "BUSIA"],
+  "BUNYALA": ["PORT VICTORIA", "AARON OMONG'IN", "BUSIA"],
+  "MULUKHONI": ["PORT VICTORIA", "AARON OMONG'IN", "BUSIA"],
+  "MALABA": ["MALABA CBD", "NO FCRO", "BUSIA"],
+  "AMAGORO": ["MALABA CBD", "NO FCRO", "BUSIA"],
+  "AMUKURA": ["AMUKURA", "NO FCRO", "BUSIA"],
+  "KIMAETI": ["KIMAETI", "TESLYNE SIMIYU", "BUNGOMA"],
+  "LUKOLIS": ["MALABA", "NO FCRO", "BUSIA"],
+  "ANGURAI": ["ANGURAI", "NO FCRO", "BUSIA"],
+  "UGUNJA": ["SIAYA", "MERCY OYUGI", "BUSIA"],
+  "UKWALA": ["SIAYA", "MERCY OYUGI", "BUSIA"],
+  "LIGEGA": ["SIAYA", "MERCY OYUGI", "BUSIA"],
+  "SIDINDI": ["SIAYA", "MERCY OYUGI", "BUSIA"],
+  "RWAMBWA": ["SIAYA", "MERCY OYUGI", "BUSIA"],
+  "SEGA": ["SIAYA", "MERCY OYUGI", "BUSIA"],
+  "RANGALA": ["SIAYA", "MERCY OYUGI", "BUSIA"],
+  "RATADO SIAYA": ["SIAYA", "MERCY OYUGI", "BUSIA"],
+  "TURBO": ["turbo kipkaren", "LEWIS KIPNGETICH", "ELDORET"],
+  "MATUNDA - ELDORET": ["soy matunda", "LEWIS KIPNGETICH", "ELDORET"],
+  "SOY - ELDORET": ["soy matunda", "LEWIS KIPNGETICH", "ELDORET"],
+  "PANPAPER": ["PANPAPER", "LEWIS KIPNGETICH", "ELDORET"],
+  "MUSEMBE": ["TURBO", "LEWIS KIPNGETICH", "ELDORET"],
+  "NANGILI": ["SOY", "LEWIS KIPNGETICH", "ELDORET"],
+  "SANGO": ["SOY", "LEWIS KIPNGETICH", "ELDORET"],
+  "LIKUYANI": ["LIKUYANI", "LEWIS KIPNGETICH", "ELDORET"],
+  "FUFARAL": ["SOY", "LEWIS KIPNGETICH", "ELDORET"],
+  "LUGARI": ["TURBO", "LEWIS KIPNGETICH", "ELDORET"],
+  "LUMAKANDA": ["TURBO", "LEWIS KIPNGETICH", "ELDORET"],
+  "MLIMANI - ELDORET": ["ELDORET", "LEWIS KIPNGETICH", "ELDORET"],
+  "MUHONJE": ["TURBO", "LEWIS KIPNGETICH", "ELDORET"],
+  "CHEKALINI": ["TURBO", "LEWIS KIPNGETICH", "ELDORET"],
+  "KIPKAREN RIVER": ["TURBO", "LEWIS KIPNGETICH", "ELDORET"],
+  "MAGUT": ["MAGUT", "LEWIS KIPNGETICH", "ELDORET"],
+  "MWAMBA": ["MWAMBA", "LEWIS KIPNGETICH", "ELDORET"],
+  "MOSORIOT": ["mosoriot kurgung", "SALOME CHEPKEEMOI", "ELDORET"],
+  "NDALAT": ["ndalat selia", "SALOME CHEPKEEMOI", "ELDORET"],
+  "HURUMA - ELDORET": ["huruma maili nne", "SALOME CHEPKEEMOI", "ELDORET"],
+  "BURNT FOREST": ["burnt forest", "SALOME CHEPKEEMOI", "ELDORET"],
+  "KABIYET": ["burnt forest", "SALOME CHEPKEEMOI", "ELDORET"],
+  "KAPSERET": ["kapsabet", "SALOME CHEPKEEMOI", "ELDORET"],
+  "KIPKAREN": ["langas kapseret", "SALOME CHEPKEEMOI", "ELDORET"],
+  "JUAKALI - ELDORET": ["TURBO", "SALOME CHEPKEEMOI", "ELDORET"],
+  "KIPKENYO": ["ndalat selia", "SALOME CHEPKEEMOI", "ELDORET"],
+  "KIPKAREN ESTATE": ["ndalatselia", "SALOME CHEPKEEMOI", "ELDORET"],
+  "KAIBOI": ["NDALAT", "SALOME CHEPKEEMOI", "ELDORET"],
+  "KURGUNG": ["NDALAT", "SALOME CHEPKEEMOI", "ELDORET"],
+  "MAILI NNE - ELDORET": ["huruma maili nne", "SALOME CHEPKEEMOI", "ELDORET"],
+  "TIMBOROA": ["BURNT FOREST", "SALOME CHEPKEEMOI", "ELDORET"],
+  "MATHARU": ["BURNT FOREST", "SALOME CHEPKEEMOI", "ELDORET"],
+  "BLOCK 4": ["mosoriot kurgung", "SALOME CHEPKEEMOI", "ELDORET"],
+  "KABISAGA": ["NDALAT", "SALOME CHEPKEEMOI", "ELDORET"],
+  "CHEPTERWAI": ["NDALAT", "SALOME CHEPKEEMOI", "ELDORET"],
+  "HILL TEA": ["huruma maili nne", "SALOME CHEPKEEMOI", "ELDORET"],
+  "SEGUTON": ["BURNT FOREST", "SALOME CHEPKEEMOI", "ELDORET"],
+  "BAHARINI": ["huruma maili nne", "SALOME CHEPKEEMOI", "ELDORET"],
+  "BAYETE": ["BURNT FOREST", "SALOME CHEPKEEMOI", "ELDORET"],
+  "CHEREBER": ["CHEREBER", "SALOME CHEPKEEMOI", "ELDORET"],
+  "LODWAR": ["lodwar", "ISSAC SHAMOLA", "ELDORET"],
+  "KAKUMA": ["kakuma", "ISSAC SHAMOLA", "ELDORET"],
+  "LOKICHAR": ["lodwar", "ISSAC SHAMOLA", "ELDORET"],
+  "LOKICHOGIO": ["lodwar", "ISSAC SHAMOLA", "ELDORET"],
+  "KANAAM": ["KANAAM", "ISSAC SHAMOLA", "ELDORET"],
+  "KAPSABET": ["kapsabet", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "KAPTUMO": ["Nandihills", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "NANDI HILLS": ["Nandihills", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "HIMAKI": ["LESSOS", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "KAMOBO": ["kapsabet", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "BARATON": ["KAPSABET", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "LESSOS - ELDORET": ["LESSOS", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "KIMWANI": ["NANDI HILLS", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "NAMGOI": ["NAMGOI JUNCTION", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "YALA - ELDORET": ["KAPSABET", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "CHEPTERIT": ["KAPSABET", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "KOBUJOI": ["NANDI HILLS", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "TULON": ["NANDI HILLS", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "CHEPSONOI": ["KAPSABET", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "KIPSIGAK": ["NANDI HILLS", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "TINDERET": ["Nandihills", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "KAPSASUR": ["KAPSABET", "MARTHA KOINANGE& FRED TANUI", "ELDORET"],
+  "LANGAS - ELDORET": ["langas kapseret", "JEREMIAH MOMANYI", "ELDORET"],
+  "ROAD BLOCK": ["MAILI NNE", "JEREMIAH MOMANYI", "ELDORET"],
+  "MUNYAKA - ELDORET": ["KIMUMU", "JEREMIAH MOMANYI", "ELDORET"],
+  "KESSES": ["kesses", "JEREMIAH MOMANYI", "ELDORET"],
+  "CHEPTIRET": ["KESSES", "JEREMIAH MOMANYI", "ELDORET"],
+  "KIPLOMBE": ["KIMUMU", "JEREMIAH MOMANYI", "ELDORET"],
+  "NGERIA": ["KESSES", "JEREMIAH MOMANYI", "ELDORET"],
+  "ANNEX": ["kesses", "JEREMIAH MOMANYI", "ELDORET"],
+  "MOI - ELDORET": ["KESSES", "JEREMIAH MOMANYI", "ELDORET"],
+  "JERUSALEM": ["JERUSALEM", "JEREMIAH MOMANYI", "ELDORET"],
+  "MWANZO": ["MWANZO", "JEREMIAH MOMANYI", "ELDORET"],
+  "KIMUMU": ["kimumu", "JEREMIAH MOMANYI", "ELDORET"],
+  "TAIRI MBILI": ["TAIRI MBILI", "JEREMIAH MOMANYI", "ELDORET"],
+  "KAPSOYA": ["kimumu", "JEREMIAH MOMANYI", "ELDORET"],
+  "SINAI - ELDORET": ["SINAI", "JEREMIAH MOMANYI", "ELDORET"],
+  "HAWAII": ["kimumu", "JEREMIAH MOMANYI", "ELDORET"],
+  "TELEVIEW": ["LANGAS", "JEREMIAH MOMANYI", "ELDORET"],
+  "KISUMU NDOGO - ELDORET": ["langas kapseret", "JEREMIAH MOMANYI", "ELDORET"],
+  "ELDORET CBD": ["Eldoret cbd", "NANCY NDANU", "ELDORET"],
+  "PIONEER - ELDORET": ["CBD", "NANCY NDANU", "ELDORET"],
+  "KABARNET": ["kabarnet", "IRINE JEROP", "ELDORET"],
+  "ITEN": ["iten highway", "IRINE JEROP", "ELDORET"],
+  "ZIWA - ELDORET": ["ziwa moiben", "IRINE JEROP", "ELDORET"],
+  "KABARTONJO": ["iten highway", "IRINE JEROP", "ELDORET"],
+  "BIRETWO": ["KABARNET", "IRINE JEROP", "ELDORET"],
+  "MOIBEN": ["ZIWA", "IRINE JEROP", "ELDORET"],
+  "FLAX": ["flax", "IRINE JEROP", "ELDORET"],
+  "MEREWET": ["iten highway", "IRINE JEROP", "ELDORET"],
+  "CHEPKOILEL": ["ZIWA", "IRINE JEROP", "ELDORET"],
+  "CHEPTONGEI": ["KAPSOWAR", "IRINE JEROP", "ELDORET"],
+  "KAPSOWAR": ["KAPSOWAR", "IRINE JEROP", "ELDORET"],
+  "KUINET": ["ZIWA", "IRINE JEROP", "ELDORET"],
+  "CHEPKANGA": ["ITEN", "IRINE JEROP", "ELDORET"],
+  "KABENES": ["ZIWA", "IRINE JEROP", "ELDORET"],
+  "KIPKORGOT": ["FLAX", "IRINE JEROP", "ELDORET"],
+  "MARURA": ["MARURA", "IRINE JEROP", "ELDORET"],
+  "KASOYO": ["KASOYO", "IRINE JEROP", "ELDORET"],
+  "KATALEL": ["KATALEL", "IRINE JEROP", "ELDORET"],
+  "NYARU": ["NYARU", "IRINE JEROP", "ELDORET"],
+  "MARAKWET": ["MARAKWET", "IRINE JEROP", "ELDORET"],
+  "EMBU": ["EMBU", "EDWARD MATHU", "EMBU"],
+  "MUTUNDURI": ["EMBU", "EDWARD MATHU", "EMBU"],
+  "PI": ["MWEA", "EDWARD MATHU", "EMBU"],
+  "MURURI": ["MWEA", "EDWARD MATHU", "EMBU"],
+  "SIAKAGO": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "ISHIARA": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "KIRITIRI": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "MASINGA": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "BONDONI": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "MURARU": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "KANYUAMBORA": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "KAEWA - EMBU": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "KARURUMO": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "KAMUMU": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "KIVAA - EMBU": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "UGWERI": ["EMBU", "ERIC KAVIU", "EMBU"],
+  "KIAMUTUGU": ["MWEA", "PAMELA KAGEMI", "EMBU"],
+  "KIBUGU": ["MWEA", "PAMELA KAGEMI", "EMBU"],
+  "KITHURE": ["MWEA", "PAMELA KAGEMI", "EMBU"],
+  "MUTITHI": ["MWEA", "PAMELA KAGEMI", "EMBU"],
+  "KIMBIMBI": ["MWEA", "PAMELA KAGEMI", "EMBU"],
+  "MWEA": ["MWEA", "PAMELA KAGEMI", "EMBU"],
+  "KIANJOKOMA": ["EMBU", "PAMELA KAGEMI", "EMBU"],
+  "MANYATTA - EMBU": ["EMBU", "PAMELA KAGEMI", "EMBU"],
+  "KITHIMU": ["EMBU", "PAMELA KAGEMI", "EMBU"],
+  "KEVOTE": ["EMBU", "PAMELA KAGEMI", "EMBU"],
+  "CHUKA": ["CHUKA ROUTE", "STELLA NDWIGA", "EMBU"],
+  "CHOGORIA": ["CHUKA ROUTE", "STELLA NDWIGA", "EMBU"],
+  "NDAGANI": ["CHUKA", "STELLA NDWIGA", "EMBU"],
+  "KIGUMO": ["CHUKA", "STELLA NDWIGA", "EMBU"],
+  "KATHAGERI": ["CHUKA", "STELLA NDWIGA", "EMBU"],
+  "RUNYENJES": ["CHUKA", "STELLA NDWIGA", "EMBU"],
+  "CHEERA": ["CHUKA", "STELLA NDWIGA", "EMBU"],
+  "ENA": ["EMBU", "STELLA NDWIGA", "EMBU"],
+  "KAHAWA WEST": ["KAHAWA WEST", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "KASARANI": ["KASARANI", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "ZIMMERMAN": ["ZIMMERMAN", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "ROYSAMBU": ["KASARANI", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "MARURUI": ["ZIMMERMAN", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "MAZIWA": ["MAZIWA", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "KENYATTA MARKET": ["KENYATTA MARKET", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "ROASTERS": ["KASARANI", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "NGUMBA": ["ZIMMERMAN", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "NGOMONGO - GITHURAI": ["ZIMMERMAN", "KIRICHU MARY WANGECHI", "GITHURAI"],
+  "GITHURAI 45": ["GITHURAI 45", "LILIAN KIRAGU WAWIRA", "GITHURAI"],
+  "MWIHOKO": ["MWIHOKO", "LILIAN KIRAGU WAWIRA", "GITHURAI"],
+  "PROGRESSIVE": ["PROGRESSIVE", "LILIAN KIRAGU WAWIRA", "GITHURAI"],
+  "EASTERN BYPASS": ["BYPASS", "NO FCRO", "GITHURAI"],
+  "MATANGI": ["RUIRU", "NO FCRO", "GITHURAI"],
+  "MURERA": ["MURERA", "NO FCRO", "GITHURAI"],
+  "KIHUNGURO": ["BYPASS", "NO FCRO", "GITHURAI"],
+  "KAMAKIS": ["KAMAKIS", "NO FCRO", "GITHURAI"],
+  "MUMBI": ["MUMBI", "NO FCRO", "GITHURAI"],
+  "KAHAWA WENDANI": ["KAHAWA WENDANI", "NO FCRO", "GITHURAI"],
+  "KAHAWA SUKARI": ["KAHAWA SUKARI", "NO FCRO", "GITHURAI"],
+  "KIAMBU": ["KIAMBU", "PATRICK THIGA", "GITHURAI"],
+  "RUIRU TOWN": ["RUIRU", "PATRICK THIGA", "GITHURAI"],
+  "GITHUNGURI": ["GITHUNGURI", "PATRICK THIGA", "GITHURAI"],
+  "NDUMBERI": ["NDUMBERI", "PATRICK THIGA", "GITHURAI"],
+  "KIRIGITI": ["KIRIGITI", "PATRICK THIGA", "GITHURAI"],
+  "KWAMAIKO": ["KWAMAIKO", "PATRICK THIGA", "GITHURAI"],
+  "KIBICHOI": ["KIBICHOI", "PATRICK THIGA", "GITHURAI"],
+  "IKINU": ["IKINU", "PATRICK THIGA", "GITHURAI"],
+  "GITHIGA": ["GITHIGA", "PATRICK THIGA", "GITHURAI"],
+  "GITHOGORO": ["GITHOGORO", "PATRICK THIGA", "GITHURAI"],
+  "TINGANGA": ["TINGANGA", "PATRICK THIGA", "GITHURAI"],
+  "THINDIGUA": ["THINDIGUA", "PATRICK THIGA", "GITHURAI"],
+  "GITHURAI 44": ["GITHURAI 44", "JAMES MWANGI", "GITHURAI"],
+  "KIMBO": ["KIMBO", "JAMES MWANGI", "GITHURAI"],
+  "MEMBLEY": ["MEMBLEY", "JAMES MWANGI", "GITHURAI"],
+  "WATAALUM": ["WATAALUM", "JAMES MWANGI", "GITHURAI"],
+  "PRISON": ["PRISON", "JAMES MWANGI", "GITHURAI"],
+  "MWIKI": ["MWIKI", "VICTOR MOGENDI", "GITHURAI"],
+  "MAJI MAZURI": ["MAJI MAZURI", "VICTOR MOGENDI", "GITHURAI"],
+  "SUNTON": ["SUNTON", "VICTOR MOGENDI", "GITHURAI"],
+  "HUNTERS": ["HUNTERS", "VICTOR MOGENDI", "GITHURAI"],
+  "DELIVERANCE GITHURAI": ["DELIVERANCE", "VICTOR MOGENDI", "GITHURAI"],
+  "KAGIO": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "SAGANA": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "MAKUTANO - KARATINA": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KIBINGOTI": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "GATEGI": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "PI KARABA": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KIBURU": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KIVIRIGWI": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KANDONGU": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "BARICHO": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KIANIA": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KIANGWACI": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KIMICHA": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "CIAGINI": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "NTHINGINI": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KIMUNYE": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KAMUGUNDA": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KAMORO": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KANGOCHO": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KAVUTI": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KIANJEGE": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KARUMANDI": ["SAGANA", "JOEL KIMEMIA", "KARATINA"],
+  "KARATINA": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KERUGOYA": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "MUKINDURI": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KAGUMO": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KIANGAI": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KIVINGO": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "GATHAMBI": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KANGAITA": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KIANGUENYI": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KIRIAINI": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "ITHARE": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "GATWE": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KIAMWATHI": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KIANGOMBE": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KAHARA": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KARIA - KARATINA": ["KARATINA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KIANYAGA": ["MWEA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "KUTUS": ["MWEA", "NJOROGE MARY WAIRIMU", "KARATINA"],
+  "NYERI": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "KIAWARA": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "MWEIGA": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "NGOBIT": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "NDARAGWA": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "JIKAZE": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "NAIRUTIA": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "GATITU": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "SKUTA": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "KIANDU": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "WATUKA": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "NYARIBO": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "GICHIRA": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "MUTHINGA": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "ENDARASHA": ["NYERI", "MWAURA MOSES KARIUKI", "KARATINA"],
+  "MURANG'A": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "KANGEMA": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "MUKUYU": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "MARAGWA": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "KAHATIA": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "MURIRANJAS": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "KANYENYAINI": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "KAHURO": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "KAGANDA": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "RWATHIA": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "KABUTA": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "KARURI": ["GIAKANJA", "ELIZABETH WANJIKU", "KARATINA"],
+  "KIHOYA": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "GACHIRIRO": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "KAGAA": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "MATHIOYA": ["MURANGA", "ELIZABETH WANJIKU", "KARATINA"],
+  "SABASABA": ["KARATINA", "ELIZABETH WANJIKU", "KARATINA"],
+  "MUKURWEINI": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "GAKINDU": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "TUMUTUMU": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "MUTHUTHINI": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "OTHAYA": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "GIAKANJA": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "MAHIGA": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "KIAMARIGA": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "WALAZO": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "KIMAHURI": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "CHAKA": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "NARUMORU": ["OTHAYA", "RUTH WANGUI", "NANYUKI"],
+  "GIAKAIBEI": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "KAIRUTHI": ["OTHAYA", "RUTH WANGUI", "KARATINA"],
+  "GACHIE": ["GACHIE", "LYDIA WANGUI", "KAWANGWARE"],
+  "RUAKA": ["RUAKA", "LYDIA WANGUI", "KAWANGWARE"],
+  "WANGIGE": ["WANGIGE", "LYDIA WANGUI", "KAWANGWARE"],
+  "BANANA": ["BANANA", "LYDIA WANGUI", "KAWANGWARE"],
+  "NDENDERU": ["NDENDERU", "LYDIA WANGUI", "KAWANGWARE"],
+  "LOWER KABETE": ["KABETE", "LYDIA WANGUI", "KAWANGWARE"],
+  "MWIMUTO": ["MWIMUTO", "LYDIA WANGUI", "KAWANGWARE"],
+  "MUCHATHA": ["RUAKA", "LYDIA WANGUI", "KAWANGWARE"],
+  "KARURA": ["KARURA", "LYDIA WANGUI", "KAWANGWARE"],
+  "NGECHA": ["NGECHA", "LYDIA WANGUI", "KAWANGWARE"],
+  "GIKUNI": ["GIKUNI", "LYDIA WANGUI", "KAWANGWARE"],
+  "KABETE": ["KABETE", "LYDIA WANGUI", "KAWANGWARE"],
+  "GATHIGA": ["GATHIGA", "LYDIA WANGUI", "KAWANGWARE"],
+  "GEKUNI": ["WANGIGE", "LYDIA WANGUI", "KAWANGWARE"],
+  "KAMTUINI": ["KAMTUINI", "LYDIA WANGUI", "KAWANGWARE"],
+  "UTHIRU": ["UTHIRU", "NANCY KERORE", "KAWANGWARE"],
+  "NDUNYU": ["NDUNYU", "NANCY KERORE", "KAWANGWARE"],
+  "WAITHAKA": ["WAITHAKA", "NANCY KERORE", "KAWANGWARE"],
+  "ZAMBEZI": ["ZAMBEZI", "NANCY KERORE", "KAWANGWARE"],
+  "THAMANDA": ["THAMANDA", "NANCY KERORE", "KAWANGWARE"],
+  "REGEN": ["LIMURU", "NANCY KERORE", "KAWANGWARE"],
+  "MUTHIGA": ["LIMURU", "NANCY KERORE", "KAWANGWARE"],
+  "KAREN - KAWANGWARE": ["KAREN", "NANCY KERORE", "KAWANGWARE"],
+  "NDERI": ["NDERI", "NANCY KERORE", "KAWANGWARE"],
+  "LIMURU": ["LIMURU", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "KIKUYU": ["KIKUYU", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "GIKAMBURA": ["GIKAMBURA", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "KINOO": ["KINOO", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "KAMANGU": ["KAMANGU", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "THOGOTO": ["THOGOTO", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "KIAMBAA": ["KIAMBAA", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "RUTHIGITI": ["RUTHIGITI", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "GITARU": ["GITARU", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "KWAMBERA": ["KWAMBIRA", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "MBOROTI": ["MBOROTI", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "NYAMBARI": ["NYAMBARI", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "KABUKU": ["KABUKU", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "NGARARIGA": ["NGARARIGA", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "NDEIYA": ["NDEIYA", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "RUSIGITI": ["RUTHIGITI", "AGRIPINA LIKHALE", "KAWANGWARE"],
+  "KIBERA": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "HAYANI": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "JAMHURI": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "OLYMPIC": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "NGONG ROAD": ["NGONG RD", "EDITH OKUMU", "KAWANGWARE"],
+  "GATWEKERA": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "KATWEKERA": ["KIBERA", "NO FCRO", "KAWANGWARE"],
+  "MAKINA": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "LINDI": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "MASHIMONI": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "LINE SABA": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "DARAJANI": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "NGUMO": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "SOWETO - KAWANGWARE": ["KIBERA", "NO FCRO", "KAWANGWARE"],
+  "SILANGA": ["KIBERA", "EDITH OKUMU", "KAWANGWARE"],
+  "KAWANGWARE": ["KAWANGWARE", "DAN MUTUNGA", "KAWANGWARE"],
+  "LAVINGTON": ["LAVINGTON", "DAN MUTUNGA", "KAWANGWARE"],
+  "KANGEMI": ["KANGEMI", "DAN MUTUNGA", "KAWANGWARE"],
+  "KILIMANI": ["KILIMANI", "DAN MUTUNGA", "KAWANGWARE"],
+  "WESTLANDS - KAWANG": ["WESTLANDS", "DAN MUTUNGA", "KAWANGWARE"],
+  "YAYA": ["YAYA", "DAN MUTUNGA", "KAWANGWARE"],
+  "HURLIGHAM": ["HURLIGHAM", "DAN MUTUNGA", "KAWANGWARE"],
+  "KILELESHWA": ["KILELESHWA", "DAN MUTUNGA", "KAWANGWARE"],
+  "KABIRIA": ["KABIRIA", "VALERIE AYIERA", "KAWANGWARE"],
+  "NAIVASHA ROAD": ["NAIVASHA RD", "VALERIE AYIERA", "KAWANGWARE"],
+  "NGANDO": ["NGANDO", "VALERIE AYIERA", "KAWANGWARE"],
+  "KINYANJUI": ["KINYANJUI", "VALERIE AYIERA", "KAWANGWARE"],
+  "DAGORETTI": ["DAGORETTI", "VALERIE AYIERA", "KAWANGWARE"],
+  "NGINA ROAD": ["NGINA ROAD", "VALERIE AYIERA", "KAWANGWARE"],
+  "WANYEE": ["WANYEE", "VALERIE AYIERA", "KAWANGWARE"],
+  "SATELLITE": ["SATELLITE", "VALERIE AYIERA", "KAWANGWARE"],
+  "DELIVERANCE KAWANGWARE": ["DELIVERENCE", "VALERIE AYIERA", "KAWANGWARE"],
+  "MUTHAMA": ["MUTHAMA", "VALERIE AYIERA", "KAWANGWARE"],
+  "NDWARU": ["NDWARU", "VALERIE AYIERA", "KAWANGWARE"],
+  "MTEGO": ["MTEGO", "VALERIE AYIERA", "KAWANGWARE"],
+  "MBALE": ["MBALE", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "CHEPTULU": ["CHEPTULU", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "VIHIGA": ["VIHIGA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "MAJENGO - KAKAMEGA": ["HAMISI", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "CHAVAKALI": ["MBALE", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "SEREM": ["CHEPTULU", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "HAMISI": ["HAMISI", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "MAGO": ["CHEPTULU", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "MUDETE": ["CHEPTULU", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "EREGI": ["MBALE CBD", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "SHAMAKHOKHO": ["CHEPTULU", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "MAHANGA": ["EMUHAYA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "JEBROK": ["HAMISI", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "KILINGILI": ["KHOMUSALABA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "VUYALO": ["KHOMUSALABA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "ESHIBANGA": ["EMUHAYA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "ESIBUYE": ["EMUHAYA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "ESIRULO": ["KHOMUSALABA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "VOKOLI": ["CHEPTULU", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "GISAMBAI": ["HAMISI", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "MAGADA": ["EMUHAYA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "KEGONDI": ["EMUHAYA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "KAIMOSI": ["KAIMOSI", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "KHUMSALABA": ["KHUMSALABA", "BRIDGIT YVETTE LUNGWE", "KAKAMEGA"],
+  "MUMIAS CBD": ["MUMIAS", "LILIAN MWANJE", "KAKAMEGA"],
+  "BUTERE": ["BUTERE", "LILIAN MWANJE", "KAKAMEGA"],
+  "SHIANDA": ["SHIANDA", "LILIAN MWANJE", "KAKAMEGA"],
+  "MATUNGU": ["MATUNGU", "LILIAN MWANJE", "KAKAMEGA"],
+  "BUKURA": ["BUKURA", "LILIAN MWANJE", "KAKAMEGA"],
+  "MUSANDA": ["MUSANDA", "LILIAN MWANJE", "KAKAMEGA"],
+  "SHIBALE": ["MUMIAS", "LILIAN MWANJE", "KAKAMEGA"],
+  "BUHURU": ["MUSANDA", "LILIAN MWANJE", "KAKAMEGA"],
+  "MAONDO": ["SHINYALU", "LILIAN MWANJE", "KAKAMEGA"],
+  "EKERO": ["MUMIAS", "LILIAN MWANJE", "KAKAMEGA"],
+  "MANYULIA": ["BUTERE", "LILIAN MWANJE", "KAKAMEGA"],
+  "KAMASHIA": ["BUKURA", "LILIAN MWANJE", "KAKAMEGA"],
+  "LUNZA": ["BUKURA", "LILIAN MWANJE", "KAKAMEGA"],
+  "SHIATSALA": ["BUTERE", "LILIAN MWANJE", "KAKAMEGA"],
+  "KOYONZO": ["MATUNGU", "LILIAN MWANJE", "KAKAMEGA"],
+  "INAYA": ["MATUNGU", "LILIAN MWANJE", "KAKAMEGA"],
+  "MAYONI": ["MUMIAS", "LILIAN MWANJE", "KAKAMEGA"],
+  "MANYALA": ["BUTERE", "LILIAN MWANJE", "KAKAMEGA"],
+  "IMANGA": ["MUSANDA", "LILIAN MWANJE", "KAKAMEGA"],
+  "SABATIA BUTERE": ["BUTERE", "LILIAN MWANJE", "KAKAMEGA"],
+  "KAKAMEGA CBD": ["KAKAMEGA CBD", "MWANJE MOURINE SHITANDI", "KAKAMEGA"],
+  "AMALEMBA": ["KHAYEGA", "MWANJE MOURINE SHITANDI", "KAKAMEGA"],
+  "KAMBI YA MWANZA": ["WEST KENYA", "MWANJE MOURINE SHITANDI", "KAKAMEGA"],
+  "MALAVA": ["MALAVA", "MWANJE MOURINE SHITANDI", "KAKAMEGA"],
+  "ESHISIRU": ["LURAMBI", "MWANJE MOURINE SHITANDI", "KAKAMEGA"],
+  "KHAYEGA": ["KHAYEGA", "MWANJE MOURINE SHITANDI", "KAKAMEGA"],
+  "LURAMBI": ["KAKAMEGA CBD", "MWANJE MOURINE SHITANDI", "KAKAMEGA"],
+  "MAKUNGA - KAKAMEGA": ["SHIANDA", "MWANJE MOURINE SHITANDI", "KAKAMEGA"],
+  "SHIBULI": ["SHIBULI", "MWANJE MOURINE SHITANDI", "KAKAMEGA"],
+  "NAVAKHOLO": ["NAMBACHA", "REUBEN SAKALA", "KAKAMEGA"],
+  "MATETE": ["WEBUYE", "REUBEN SAKALA", "KAKAMEGA"],
+  "SHINYALU": ["SHINYALU", "REUBEN SAKALA", "KAKAMEGA"],
+  "MUSOLI": ["MUSOLI", "REUBEN SAKALA", "KAKAMEGA"],
+  "MALAHA": ["SHIANDA", "REUBEN SAKALA", "KAKAMEGA"],
+  "KHWISERO": ["MUSOLI", "REUBEN SAKALA", "KAKAMEGA"],
+  "MALINYA": ["MUSOLI", "REUBEN SAKALA", "KAKAMEGA"],
+  "BOMET CBD": ["BOMET", "LISBON KIMUTAI", "KERICHO"],
+  "SILBWET": ["SILIBWET", "LISBON KIMUTAI", "KERICHO"],
+  "SOTIK": ["SOTIK", "LISBON KIMUTAI", "KERICHO"],
+  "CHEBUNYO": ["CHEBUNYO", "LISBON KIMUTAI", "KERICHO"],
+  "DIKIR - KERICHO": ["BOMET", "LISBON KIMUTAI", "KERICHO"],
+  "NDANAI": ["SOTIK", "LISBON KIMUTAI", "KERICHO"],
+  "MAKIMENY": ["CHEBUNYO", "LISBON KIMUTAI", "KERICHO"],
+  "KAPKWEN": ["KAPLONG", "LISBON KIMUTAI", "KERICHO"],
+  "KAPLONG": ["KAPLONG", "LISBON KIMUTAI", "KERICHO"],
+  "CHEBOLE": ["KAPLONG", "LISBON KIMUTAI", "KERICHO"],
+  "KAMUREITO": ["KAPLONG", "LISBON KIMUTAI", "KERICHO"],
+  "TEMBWO": ["SOTIK", "LISBON KIMUTAI", "KERICHO"],
+  "SIONGIROI": ["CHEBUNYO", "LISBON KIMUTAI", "KERICHO"],
+  "LONGISA": ["LONGISA", "COLLINS KETER", "KERICHO"],
+  "MULOT": ["MULOT", "COLLINS KETER", "KERICHO"],
+  "SIGOR - KERICHO": ["SIGOR", "COLLINS KETER", "KERICHO"],
+  "SUNSET": ["MULOT", "COLLINS KETER", "KERICHO"],
+  "MERIGI": ["MERIGI", "COLLINS KETER", "KERICHO"],
+  "KEMBU": ["LONGISA", "COLLINS KETER", "KERICHO"],
+  "YOUTH FARMERS": ["MERIGI", "COLLINS KETER", "KERICHO"],
+  "SOGOO": ["SOGOO", "COLLINS KETER", "KERICHO"],
+  "CHEMANER": ["LONGISA", "COLLINS KETER", "KERICHO"],
+  "OLBUTYO": ["SIGOR", "COLLINS KETER", "KERICHO"],
+  "BAKOYOT": ["SOGOO", "COLLINS KETER", "KERICHO"],
+  "KIPSUTER": ["SIGOR", "COLLINS KETER", "KERICHO"],
+  "KABOSON": ["SIGOR", "COLLINS KETER", "KERICHO"],
+  "KIMOGORO": ["SOGOO", "COLLINS KETER", "KERICHO"],
+  "KAPKOMBUN": ["MERIGI", "COLLINS KETER", "KERICHO"],
+  "KISITO": ["SIGOR", "COLLINS KETER", "KERICHO"],
+  "LITEIN": ["LITEIN", "DENNIS KIBET", "KERICHO"],
+  "MOGOGOSIEK": ["KOIWA", "DENNIS KIBET", "KERICHO"],
+  "CHEBORGEY": ["LITEIN", "DENNIS KIBET", "KERICHO"],
+  "KOIWA": ["KOIWA", "DENNIS KIBET", "KERICHO"],
+  "KAPKATET": ["KAPKATET", "DENNIS KIBET", "KERICHO"],
+  "SIGOWET": ["RORET", "DENNIS KIBET", "KERICHO"],
+  "NGOINA RD": ["RORET", "DENNIS KIBET", "KERICHO"],
+  "KAPGWEN": ["KAPSET", "DENNIS KIBET", "KERICHO"],
+  "RORET": ["RORET", "DENNIS KIBET", "KERICHO"],
+  "KAPSET": ["KAPSET", "DENNIS KIBET", "KERICHO"],
+  "CHEBOIN": ["LITEIN", "DENNIS KIBET", "KERICHO"],
+  "BOITO": ["KOIWA", "DENNIS KIBET", "KERICHO"],
+  "KERICHO CBD": ["KERICHO", "RAYMOND KIPNGETICH", "KERICHO"],
+  "KAPSOIT": ["KAPSOIT", "RAYMOND KIPNGETICH", "KERICHO"],
+  "KIPSITET": ["KIPSITET", "RAYMOND KIPNGETICH", "KERICHO"],
+  "BROOKE": ["BROOKE", "RAYMOND KIPNGETICH", "KERICHO"],
+  "CHEPNYOGAA": ["KAPSOIT", "RAYMOND KIPNGETICH", "KERICHO"],
+  "KURESOI - KERICHO": ["KURESOI", "RAYMOND KIPNGETICH", "KERICHO"],
+  "LONDIANI": ["KURESOI", "RAYMOND KIPNGETICH", "KERICHO"],
+  "FORT TENAN": ["KIPSITET", "RAYMOND KIPNGETICH", "KERICHO"],
+  "KIPKELION": ["KURESOI", "RAYMOND KIPNGETICH", "KERICHO"],
+  "KABIANGA": ["KAPSOIT", "RAYMOND KIPNGETICH", "KERICHO"],
+  "KIPTERE": ["KAPSOIT", "RAYMOND KIPNGETICH", "KERICHO"],
+  "AINAMOI": ["BROOKE", "RAYMOND KIPNGETICH", "KERICHO"],
+  "CHEPSEON": ["KURESOI", "RAYMOND KIPNGETICH", "KERICHO"],
+  "KIPSOLU": ["KAPSOIT", "RAYMOND KIPNGETICH", "KERICHO"],
+  "SOSIOT": ["KAPSOIT", "RAYMOND KIPNGETICH", "KERICHO"],
+  "GARISSA CBD": ["CBD", "PETER KIMANZI", "KENDIA"],
+  "MADOGO": ["MADOGO", "PETER KIMANZI", "KENDIA"],
+  "BANGAL": ["BANGAL", "PETER KIMANZI", "KENDIA"],
+  "BURA - KENDIA": ["MADOGO", "PETER KIMANZI", "KENDIA"],
+  "HABASWENI": ["HABASWEIN", "OSMAN", "KENDIA"],
+  "MADOGASHE": ["MADOGASHE", "OSMAN", "KENDIA"],
+  "MASALANI": ["MASALANI", "OSMAN", "KENDIA"],
+  "IJARA": ["IJARA", "OSMAN", "KENDIA"],
+  "SANGAILU": ["SANGAILU", "OSMAN", "KENDIA"],
+  "ABAKORE": ["ABAKORE", "OSMAN", "KENDIA"],
+  "DAGAHLEY": ["DAGAHLEY", "SAMIR", "KENDIA"],
+  "IFO": ["IFO", "SAMIR", "KENDIA"],
+  "HAGARDERA": ["HAGARDERA", "SAMIR", "KENDIA"],
+  "DADAAB": ["DADAAB", "SAMIR", "KENDIA"],
+  "DOBLEY": ["DOBLEY", "SAMIR", "KENDIA"],
+  "MANDERA": ["MANDERA", "NO CRO", "KENDIA"],
+  "WAJIR": ["WAJIR", "ABDIFATAR", "KENDIA"],
+  "Bula Ifftin": ["KENDIA", "PETER KIMANZI", "KENDIA"],
+  "MLOLONGO": ["MLOLONGO", "DANIEL WAMBUA", "KITENGELA"],
+  "SYOKIMAU": ["SYOKIMAU", "DANIEL WAMBUA", "KITENGELA"],
+  "KATANI": ["KATANI", "DANIEL WAMBUA", "KITENGELA"],
+  "KITENGELA MAIN STAGE": ["KITENGELA", "TITUS TAUTA", "KITENGELA"],
+  "KIMALAT": ["KIMALAT", "TITUS TAUTA", "KITENGELA"],
+  "DELIVERANCE KITENGELA": ["DELIVERANCE", "TITUS TAUTA", "KITENGELA"],
+  "MACHAKOS - KITENGELA": ["MACHAKOS", "EVERLINE", "KITENGELA"],
+  "MALILI": ["MALILI", "EVERLINE", "KITENGELA"],
+  "KATHIANI": ["KATHIANI", "EVERLINE", "KITENGELA"],
+  "WETAA MARKET": ["WETAA MARKET", "EVERLINE", "KITENGELA"],
+  "KAJIADO": ["KAJIADO", "TITUS TAUTA", "KITENGELA"],
+  "ISINYA": ["ISINYA", "TITUS TAUTA", "KITENGELA"],
+  "NAMANGA": ["NAMANGA", "TITUS TAUTA", "KITENGELA"],
+  "BISIL": ["BISIL", "TITUS TAUTA", "KITENGELA"],
+  "OLTOROTO": ["OLTOROTO", "TITUS TAUTA", "KITENGELA"],
+  "NGATATEK": ["NGATATEK", "TITUS TAUTA", "KITENGELA"],
+  "KISAJU": ["KISAJU", "TITUS TAUTA", "KITENGELA"],
+  "KOROMPOI": ["KOROMPOI", "TITUS TAUTA", "KITENGELA"],
+  "KUMPA": ["KUMPA", "TITUS TAUTA", "KITENGELA"],
+  "SABAKI - KITENGELA": ["SABAKI", "AUMA BRENDA", "KITENGELA"],
+  "TUFFOAM": ["TUFFOAM", "AUMA BRENDA", "KITENGELA"],
+  "ATHI RIVER": ["ATHI RIVER", "AUMA BRENDA", "KITENGELA"],
+  "TEXAS": ["TEXAS", "AUMA BRENDA", "KITENGELA"],
+  "KITUI CBD": ["CBD", "FAITH MWANGANGI", "KITUI"],
+  "KABATI - KITUI": ["KABATI", "FAITH MWANGANGI", "KITUI"],
+  "MUTOMO": ["MUTUMO", "FAITH MWANGANGI", "KITUI"],
+  "WAMUNYU": ["WAMUNYU", "FAITH MWANGANGI", "KITUI"],
+  "KWA VONZA": ["WAMUNYU", "FAITH MWANGANGI", "KITUI"],
+  "ZOMBE": ["ZOMBE", "FAITH MWANGANGI", "KITUI"],
+  "MBITINI": ["MBITINI", "FAITH MWANGANGI", "KITUI"],
+  "KALUNDU": ["CBD", "FAITH MWANGANGI", "KITUI"],
+  "IKUTHA": ["IKUTHA", "FAITH MWANGANGI", "KITUI"],
+  "KAVISUNI": ["KAVISUNI", "FAITH MWANGANGI", "KITUI"],
+  "KATANGI": ["WAMUNYU", "FAITH MWANGANGI", "KITUI"],
+  "KUNDAKINDU": ["CBD", "FAITH MWANGANGI", "KITUI"],
+  "IKANGA": ["MUTOMO", "FAITH MWANGANGI", "KITUI"],
+  "ENDAU": ["ZOMBE", "FAITH MWANGANGI", "KITUI"],
+  "KISASI": ["MUTOMO", "FAITH MWANGANGI", "KITUI"],
+  "MUTITO": ["MUTITO", "FAITH MWANGANGI", "KITUI"],
+  "MIAMBANI": ["MIAMBANI", "FAITH MWANGANGI", "KITUI"],
+  "MUTHALE": ["KABATI", "FAITH MWANGANGI", "KITUI"],
+  "MUTHA": ["MBITINI", "FAITH MWANGANGI", "KITUI"],
+  "KATULANI": ["CBD", "FAITH MWANGANGI", "KITUI"],
+  "MULUTU": ["CBD", "FAITH MWANGANGI", "KITUI"],
+  "MWALA": ["MWALA", "FAITH MWANGANGI", "KITUI"],
+  "KAKEANI": ["KABATI", "FAITH MWANGANGI", "KITUI"],
+  "KAEWA - KITUI": ["KITUI", "DANFUS MULEI", "KITUI"],
+  "MWINGI": ["MWINGI", "DANFUS MUTISYA", "KITUI"],
+  "MATUU": ["MATUU", "DANFUS MUTISYA", "KITUI"],
+  "EKALAKALA": ["MATUU", "DANFUS MUTISYA", "KITUI"],
+  "MIGWANI": ["MIGWANI", "DANFUS MUTISYA", "KITUI"],
+  "NUU": ["MWINGI", "DANFUS MUTISYA", "KITUI"],
+  "KISIIKI": ["MATUU", "DANFUS MUTISYA", "KITUI"],
+  "KITHYOKO": ["MWINGI", "DANFUS MUTISYA", "KITUI"],
+  "KANYONYOO": ["MATUU", "DANFUS MUTISYA", "KITUI"],
+  "IIANI": ["KIVAA/CBD", "DANFUS MUTISYA", "KITUI"],
+  "KIKUUMINI": ["KIVAA", "DANFUS MUTISYA", "KITUI"],
+  "NYAMIRA": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "MARANI": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "MOSOBETI": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "KEMERA": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "MIRUKA": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "KEGOGI": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "TINGA": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "EKERENYO": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "GESIMA": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "NYAMUSI": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "KEBIRIGO": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "MOKOMONI": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "RIOMA": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "MANGA": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "IKONGE": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "TOMBE": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "OMOGONCHORO": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "ITIBO": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "BONYUNYU": ["NYAMIRA", "JOSHUA MAGETO", "KISII"],
+  "MIGORI": ["MIGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "KEHANCHA": ["MIGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "MABERA": ["SIRARE", "PHELIX ODHIAMBO", "MIGORI"],
+  "KEGONGA": ["MIGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "SIRARE": ["SIRARE", "PHELIX ODHIAMBO", "MIGORI"],
+  "MASARA": ["MASARA", "PHELIX ODHIAMBO", "MIGORI"],
+  "MUHURU": ["MOGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "NYAKWERI": ["MOGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "OSIRI": ["MOGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "ONGER": ["MOGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "NYATIKE": ["MUHURU", "PHELIX ODHIAMBO", "MIGORI"],
+  "OTHOO": ["MOGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "URIRI": ["URIRI", "PHELIX ODHIAMBO", "MIGORI"],
+  "MIKEI": ["MOGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "GIRIBE": ["GIRIBE MIGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "NTIMARU": ["NTIMARU", "PHELIX ODHIAMBO", "MIGORI"],
+  "MASABA": ["MASABA", "PHELIX ODHIAMBO", "MIGORI"],
+  "BONDO": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "ORUBA": ["MIGORI", "PHELIX ODHIAMBO", "MIGORI"],
+  "NAMBA": ["NAMBA", "PHELIX ODHIAMBO", "MIGORI"],
+  "KISII CBD": ["KISII CBD", "ABEDNEGO MAROA", "KISII"],
+  "OGEMBO": ["OGEMBO", "ABEDNEGO MAROA", "KISII"],
+  "SUNEKA": ["SUNEKA", "ABEDNEGO MAROA", "KISII"],
+  "NYANCHWA": ["NYANCHWA", "ABEDNEGO MAROA", "KISII"],
+  "NYAKOE": ["NYAKOE", "ABEDNEGO MAROA", "KISII"],
+  "MAGENA": ["NYANGUSU", "ABEDNEGO MAROA", "KISII"],
+  "MOSOCHO": ["MOSOCHO", "ABEDNEGO MAROA", "KISII"],
+  "NYANGUSU": ["NYANGUSU", "ABEDNEGO MAROA", "KISII"],
+  "MOGONGA": ["MOGONGA", "ABEDNEGO MAROA", "KISII"],
+  "MWEMBE": ["MWEMBE", "ABEDNEGO MAROA", "KISII"],
+  "NYAMATARO": ["NYAMATARO", "ABEDNEGO MAROA", "KISII"],
+  "MENYINKWA": ["KISII CBD", "ABEDNEGO MAROA", "KISII"],
+  "RIANA": ["SUNEKA", "ABEDNEGO MAROA", "KISII"],
+  "ITUMBE": ["OGEMBO", "ABEDNEGO MAROA", "KISII"],
+  "GETARE": ["KISII CBD", "ABEDNEGO MAROA", "KISII"],
+  "SAMETA": ["OGEMBO", "ABEDNEGO MAROA", "KISII"],
+  "KIOGORO": ["OGEMBO", "ABEDNEGO MAROA", "KISII"],
+  "NYABIOTO": ["NYAMIRA/KISII CBD", "ABEDNEGO MAROA", "KISII"],
+  "EKERORANO": ["SUNEKA", "ABEDNEGO MAROA", "KISII"],
+  "IGONGA": ["SUNEKA", "ABEDNEGO MAROA", "KISII"],
+  "IYABE": ["SUNEKA", "ABEDNEGO MAROA", "KISII"],
+  "KEROKA": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "NYAMACHE": ["NYAMACHENYAMACHE", "KEFA AKUORO", "KISII"],
+  "MASIMBA - KISII": ["MASIMBA", "KEFA AKUORO", "KISII"],
+  "CHEPILAT": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "KIJAURI": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "IGARE": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "GESUSU": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "KEUMBU": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "NYACHEKI": ["NYACHEKI", "KEFA AKUORO", "KISII"],
+  "BIRONGO": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "NYABISABO": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "IBACHO": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "KIAMOKAMA": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "KEGATI": ["KEROKA", "KEFA AKUORO", "KISII"],
+  "HOMABAY": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "NYANDIWA": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "SORI": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "SINDO": ["SINDO", "SILAS OTIENO", "KISII"],
+  "NDHIWA": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "MAGUNGA": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "KENDUBAY": ["KENDUBAY", "SILAS OTIENO", "KISII"],
+  "RODI": ["RODI", "SILAS OTIENO", "KISII"],
+  "MBITA": ["MBITA", "SILAS OTIENO", "KISII"],
+  "RUSINGA": ["MBITA", "SILAS OTIENO", "KISII"],
+  "PALA": ["PALA", "SILAS OTIENO", "KISII"],
+  "KOBODO": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "MFANGANO": ["RUSINGA", "SILAS OTIENO", "KISII"],
+  "KOYANI": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "RIAT - KISII": ["RODI", "SILAS OTIENO", "KISII"],
+  "ADIEDO": ["KENDUBAY", "SILAS OTIENO", "KISII"],
+  "KIABUYA": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "LWANDA MAGWAR": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "MIROGI": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "KABUOCHI": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "NYADENDA": ["SINDO", "SILAS OTIENO", "KISII"],
+  "DHOK MIT": ["HOMABAY", "SILAS OTIENO", "KISII"],
+  "OTARO": ["KENDUBAY", "SILAS OTIENO", "KISII"],
+  "Konyango": ["KISII", "SILAS OTIENO", "KISII"],
+  "OYUGIS": ["OYUGIS", "FAITH ATIENO", "KISII"],
+  "NDIRU": ["NDIRU", "FAITH ATIENO", "KISII"],
+  "SONDU": ["SONDU", "FAITH ATIENO", "KISII"],
+  "MAWEGO": ["MAGEGO", "FAITH ATIENO", "KISII"],
+  "RANDUNG": ["RANDUNG", "FAITH ATIENO", "KISII"],
+  "MISAMBI": ["MISAMBI", "FAITH ATIENO", "KISII"],
+  "CHABERA": ["SONDU", "FAITH ATIENO", "KISII"],
+  "OBOKE": ["RANDUNG", "FAITH ATIENO", "KISII"],
+  "CHIRO KOWUOR": ["OYUGIS", "FAITH ATIENO", "KISII"],
+  "SIKRI": ["SIKRI", "FAITH ATIENO", "KISII"],
+  "RAMBA": ["RAMBA", "FAITH ATIENO", "KISII"],
+  "ONJINYO": ["OYUGIS", "FAITH ATIENO", "KISII"],
+  "RANGWE": ["OYUGIS", "FAITH ATIENO", "KISII"],
+  "RONGO": ["RONGO", "NO FCRO", "KISII"],
+  "AWENDO": ["AWENDO", "NO FCRO", "MIGORI"],
+  "TABAKA": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "RAPOGI": ["RAPOGI", "NO FCRO", "MIGORI"],
+  "KENYENYA": ["KENYENYA", "NO FCRO", "KISII"],
+  "RANEN": ["AWENDO", "NO FCRO", "KISII"],
+  "OGWEDHI": ["OGWEDHI", "NO FCRO", "MIGORI"],
+  "KANGA": ["RONGO", "NO FCRO", "KISII"],
+  "IKOBA": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "NYAKURU": ["NYAKURU", "NO FCRO", "KISII"],
+  "NYAMARAMBE": ["NYAMARAMBE", "NO FCRO", "KISII"],
+  "NYATAMBE": ["AWENDO", "NO FCRO", "KISII"],
+  "ULANDA": ["AWENDO", "NO FCRO", "MIGORI"],
+  "NYAKEMBENE": ["NYAKEMBENE", "NO FCRO", "KISII"],
+  "RIOKINDO": ["ENOOSAEN", "NO FCRO", "KISII"],
+  "NYABIORE": ["NYANGUSU", "NO FCRO", "KISII"],
+  "SUGUTA": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "NYABITUNWA": ["NYANGUSU", "NO FCRO", "KISII"],
+  "ETAGO": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "EKONA": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "KAMAGAMBO": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "NYACHENGE": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "OYANI": ["OYANI", "NO FCRO", "MIGORI"],
+  "KITERE": ["RONGO", "NO FCRO", "KISII"],
+  "MAGENCHE": ["NYANGUSU", "NO FCRO", "KISII"],
+  "MOCHENGO": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "SENGERA": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "ETONO": ["NGARARO", "NO FCRO", "KISII"],
+  "RIOSIRI": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "KOBADO": ["RONGO", "NO FCRO", "KISII"],
+  "SIBUOCHE": ["RAPOGI", "NO FCRO", "MIGORI"],
+  "EBEREGE": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "IBENCHO": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "DEDE": ["NYAKURU", "NO FCRO", "KISII"],
+  "OPAPO": ["OPAPO", "NO FCRO", "KISII"],
+  "RAKWARO": ["RONGO", "NO FCRO", "KISII"],
+  "BARANNE": ["SOUTH MUGIRANGO", "NO FCRO", "KISII"],
+  "KILGORIS": ["KILGORIS", "DUKE NGOKO", "KISII"],
+  "LOLGORIAN": ["LOLGORIAN", "DUKE NGOKO", "KISII"],
+  "ENOOSAEN": ["LOLGORIAN", "DUKE NGOKO", "KISII"],
+  "OLDONYOROK": ["LOLGORIAN", "DUKE NGOKO", "KISII"],
+  "MURGAN": ["MURGAN", "DUKE NGOKO", "KISII"],
+  "ANGATA": ["LOLGORIAN", "DUKE NGOKO", "KISII"],
+  "ENGARARO": ["NGARARO", "DUKE NGOKO", "KISII"],
+  "ESOKONI": ["LOLGORIAN", "DUKE NGOKO", "KISII"],
+  "MUTENKUAR": ["MUTENKUAR", "DUKE NGOKO", "KISII"],
+  "KIANGO": ["LOLGORIAN", "DUKE NGOKO", "KISII"],
+  "DIKIR - KISII": ["NCHIPSHIP", "DUKE NGOKO", "KISII"],
+  "KONTAMET": ["LOLGORIAN", "DUKE NGOKO", "KISII"],
+  "KONA": ["LOLGORIAN", "DUKE NGOKO", "KISII"],
+  "KATITO": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "AHERO - KISUMU": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "AWASI": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "MUHORONI": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "BUOYE": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "CHEMELIL": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "NYAMASARIA": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "RABUOR": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "MIWANI": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "MOWLEM - KISUMU": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "MASOGO": ["AHERO", "Julius Odhiambo", "KISUMU"],
+  "KISUMU CBD": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "KIBUYE": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "NYALENDA": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "KONDELE": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "MANYATTA - KISUMU": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "JUBILEE MARKET": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "CHIGA": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "KIBOS": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "KASAWINO": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "KALOLENI - KISUMU": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "KONALEGIO": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "OGANGO": ["KISUMU CBD", "NO FCRO", "KISUMU"],
+  "USENGE": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "NDORI": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "RERU": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "LWAK": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "AKALA": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "UHANYA": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "NANGO BONDO": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "BOYA MKT": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "KAMBARE": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "MIGINGO": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "RERA": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "ARAM MARKET": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "MANYWANDA MKT": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "RAGEGNE BONDO": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "KOLENYO": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "MAHAYA": ["BONDO", "WINNIE AKOTH", "KISUMU"],
+  "MAMBOLEO": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "MASENO": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "LUANDA": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "OBUNGA": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "KIBOSWA": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "KOMBEDU": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "AIRPORT": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "MIGOSI": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "KOMBEWA": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "OBAMBO": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "HOLO": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "LOLWE": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "DAGO": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "DARAJA MBILI": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "EKWANDA": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "KISIAN": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "BANDANI": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "RAUNDA MKT": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "LELA": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "OTONGLO": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "WATHOREGO": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "RIAT - KISUMU": ["MASENO", "MERCY RAJULA", "KISUMU"],
+  "SIAYA CBD": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "NGIYA": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "KODIAGA": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "YALA - KISUMU": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "SEGERE": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "NYANGONDO": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "WAGAI": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "MUTUMBU": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "NYANGOMA": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "NYANGWESO": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "NYANDORERA": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "KARAPUL, KOBAI": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "KAREMO": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "URANGA": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "MWER": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "AWELO": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "DUDI": ["SIAYA", "IRINE ADHIAMBO", "KISUMU"],
+  "MTITO ANDEI": ["Mtito Andei", "ONESMUS KIOKO", "MAKINDU"],
+  "KIBWEZI": ["KIBWEZI", "ONESMUS KIOKO", "MAKINDU"],
+  "LOITOKTOK": ["LOITOKTOK", "NICHOLAS MUMO", "MAKINDU"],
+  "KAMBU": ["KAMBU", "ONESMUS KIOKO", "MAKINDU"],
+  "MACHINERY": ["MACHINERY", "ONESMUS KIOKO", "MAKINDU"],
+  "KIMANA": ["LOITOKTOK", "NICHOLAS MUMO", "MAKINDU"],
+  "ILLASIT": ["LOITOKTOK", "NICHOLAS MUMO", "MAKINDU"],
+  "ISINET": ["LOITOKTOK", "NICHOLAS MUMO", "MAKINDU"],
+  "ROMBO": ["LOITOKTOK", "NICHOLAS MUMO", "MAKINDU"],
+  "KIUNDWANI": ["KIUNDWANI", "ONESMUS KIOKO", "MAKINDU"],
+  "MASIMBA - MAKINDU": ["MASIMBA", "ONESMUS KIOKO", "MAKINDU"],
+  "WOTE": ["WOTE", "EMMANUEL MUUO", "WOTE"],
+  "MAKINDU": ["MAKINDU", "ONESMUS KIOKO", "MAKINDU"],
+  "SULTAN HAMUD": ["Sultan Hamud", "NICHOLAS MUMO", "MAKINDU"],
+  "EMALI": ["EMALI", "NICHOLAS MUMO", "MAKINDU"],
+  "KATHONZWENI": ["Mombasa Road", "EMMANUEL MUUO", "WOTE"],
+  "NUNGUNI": ["NUNGUNI", "NICHOLAS MUMO", "MAKINDU"],
+  "KASIKEU": ["Mombasa Road", "NICHOLAS MUMO", "MAKINDU"],
+  "MALINDI CBD": ["GARSEN", "BENARD MOKHAMBA", "MALINDI"],
+  "WATAMU": ["WATAMU", "BENARD MOKHAMBA", "MALINDI"],
+  "TANA RIVER": ["TANA RIVER", "BENARD MOKHAMBA", "MALINDI"],
+  "GARSEN": ["GARSEN", "BENARD MOKHAMBA", "MALINDI"],
+  "MINJILA": ["MINJILA", "BENARD MOKHAMBA", "MALINDI"],
+  "GEDE": ["GEDE", "BENARD MOKHAMBA", "MALINDI"],
+  "KWA CHOCHA": ["MALINDI CBD", "BENARD MOKHAMBA", "MALINDI"],
+  "MAWENI - MALINDI": ["MALINDI CBD", "BENARD MOKHAMBA", "MALINDI"],
+  "PB": ["MALINDI CBD", "BENARD MOKHAMBA", "MALINDI"],
+  "MSABAHA": ["MALINDI CBD", "BENARD MOKHAMBA", "MALINDI"],
+  "MPEKETONI": ["MPEKETONI", "JOHN MIGUI", "MALINDI"],
+  "LAMU": ["LAMU", "JOHN MIGUI", "MALINDI"],
+  "GONGONI": ["GONGONI", "JOHN MIGUI", "MALINDI"],
+  "WITU": ["WITU", "JOHN MIGUI", "MALINDI"],
+  "MAJENGO - MALINDI": ["MALINDI CBD", "JOHN MIGUI", "MALINDI"],
+  "MARERENI": ["MARERENI", "JOHN MIGUI", "MALINDI"],
+  "HINDI": ["LAMU", "JOHN MIGUI", "MALINDI"],
+  "MJANAHERI": ["GONGONI", "JOHN MIGUI", "MALINDI"],
+  "MOKOWE": ["LAMU", "JOHN MIGUI", "MALINDI"],
+  "FURUNZI": ["Kisumundogo", "JOHN MIGUI", "MALINDI"],
+  "METRO": ["CBD", "JOHN MIGUI", "MALINDI"],
+  "KAKONENI": ["kakoneni", "JOHN MIGUI", "MALINDI"],
+  "SHAKAHOLA": ["Langombaya", "JOHN MIGUI", "MALINDI"],
+  "MARAFA": ["Marereni", "JOHN MIGUI", "MALINDI"],
+  "MALANGA - MALINDI": ["Malanga", "JOHN MIGUI", "MALINDI"],
+  "BAOLALA": ["BAOLALA", "JOHN MIGUI", "MALINDI"],
+  "LANGOMBAYA": ["Langombaya", "JOHN MIGUI", "MALINDI"],
+  "KIRAHO": ["Kisumundogo", "JOHN MIGUI", "MALINDI"],
+  "KOSOVO": ["MALINDI CBD", "JOHN MIGUI", "MALINDI"],
+  "KIJIWETANGA": ["KIJIWETANGA", "JOHN MIGUI", "MALINDI"],
+  "MATSANGONI": ["MATSANGONI", "NO FCRO", "MALINDI"],
+  "KISUMU NDOGO - MALINDI": ["CBD", "NO FCRO", "MALINDI"],
+  "KWA NDOMO": ["KWA NDOMO", "NO FCRO", "MALINDI"],
+  "TEZO": ["TEZO", "NO FCRO", "MALINDI"],
+  "KAKUYUNI": ["Kakuyuni", "NO FCRO", "MALINDI"],
+  "GANDA": ["Kakuyuni", "NO FCRO", "MALINDI"],
+  "SABAKI - MALINDI": ["GONGONI", "NO FCRO", "MALINDI"],
+  "SOWETO - MALINDI": ["CBD", "NO FCRO", "MALINDI"],
+  "MAMBURUI": ["Gongoni", "NO FCRO", "MALINDI"],
+  "MTONDIA": ["MTONDIA", "NO FCRO", "MALINDI"],
+  "KASUFINI": ["KASUFINI", "NO FCRO", "MALINDI"],
+  "MUYEYE": ["CBD", "NO FCRO", "MALINDI"],
+  "TAKAYE": ["CBD", "NO FCRO", "MALINDI"],
+  "CHUMANI": ["CHUMANI", "NO FCRO", "MALINDI"],
+  "MAUA": ["MAUA ROUTE", "CHRISTINE NKIROTE", "MERU"],
+  "LAARE": ["MAUA ROUTE", "CHRISTINE NKIROTE", "MERU"],
+  "KIENGU": ["MAUA ROUTE", "CHRISTINE NKIROTE", "MERU"],
+  "MIKINDURI": ["MERU CBD ROUTE", "WILLIAM LEKUKU", "MERU"],
+  "MUGAE": ["ISIOLO ROUTE", "WILLIAM LEKUKU", "MERU"],
+  "KIANJAI": ["MAUA ROUTE", "WILLIAM LEKUKU", "MERU"],
+  "KANGETA": ["MAUA ROUTE", "WILLIAM LEKUKU", "MERU"],
+  "ISIOLO": ["ISIOLO ROUTE", "GEORGE THURANI", "MERU"],
+  "MARSABIT": ["ISIOLO ROUTE", "GEORGE THURANI", "MERU"],
+  "MOYALE": ["ISIOLO ROUTE", "GEORGE THURANI", "MERU"],
+  "SOLOLO": ["ISIOLO ROUTE", "GEORGE THURANI", "MERU"],
+  "KULAMAWE": ["ISIOLO ROUTE", "GEORGE THURANI", "MERU"],
+  "WAMBA": ["ISIOLO ROUTE", "GEORGE THURANI", "MERU"],
+  "ARCHERS": ["ISIOLO ROUTE", "GEORGE THURANI", "MERU"],
+  "LAISAMIS": ["ISIOLO ROUTE", "GEORGE THURANI", "MERU"],
+  "MERU CBD": ["MERU CBD ROUTE", "EMILLY KINYA", "MERU"],
+  "MAKUTANO - MERU": ["MERU CBD ROUTE", "EMILLY KINYA", "MERU"],
+  "MARIMANTI": ["MERU CBD ROUTE", "EMILLY KINYA", "MERU"],
+  "GITHONGO": ["MERU CBD ROUTE", "EMILLY KINYA", "MERU"],
+  "NANYUKI": ["NANYUKI ROUTE", "STELLA KINYA", "NANYUKI"],
+  "TIMAU": ["NANYUKI ROUTE", "STELLA KINYA", "NANYUKI"],
+  "KIBIRICHIA": ["NANYUKI ROUTE", "STELLA KINYA", "NANYUKI"],
+  "MATANYA": ["NANYUKI ROUTE", "STELLA KINYA", "NANYUKI"],
+  "NKUBU": ["NKUBU ROUTE", "DENNIS MAKORI", "MERU"],
+  "MITUNGUU": ["NKUBU ROUTE", "DENNIS MAKORI", "MERU"],
+  "IGOJI": ["NKUBU ROUTE", "DENNIS MAKORI", "MERU"],
+  "KIONYO": ["NKUBU ROUTE", "DENNIS MAKORI", "MERU"],
+  "KINORO": ["NKUBU ROUTE", "DENNIS MAKORI", "MERU"],
+  "EQUATOR - MERU": ["NKUBU ROUTE", "DENNIS MAKORI", "MERU"],
+  "KEERIA": ["NKUBU ROUTE", "DENNIS MAKORI", "MERU"],
+  "KILIFI": ["KILIFI", "MWANGANGI MAINGI", "MOMBASA"],
+  "MTWAPA": ["MTWAPA", "MWANGANGI MAINGI", "MOMBASA"],
+  "SHANZU": ["MTWAPA", "MWANGANGI MAINGI", "MOMBASA"],
+  "KANAMAI": ["MTWAPA", "MWANGANGI MAINGI", "MOMBASA"],
+  "VIPINGO": ["MTWAPA", "MWANGANGI MAINGI", "MOMBASA"],
+  "KIKAMBALA": ["MTWAPA", "MWANGANGI MAINGI", "MOMBASA"],
+  "MAJAONI": ["MTWAPA", "MWANGANGI MAINGI", "MOMBASA"],
+  "MAVUENI": ["KILIFI", "MWANGANGI MAINGI", "MOMBASA"],
+  "SHARIANI": ["MTWAPA", "MWANGANGI MAINGI", "MOMBASA"],
+  "MSHOMORONI": ["MSHOMORONI", "PHILISTER KENYATTA", "MOMBASA"],
+  "KIEMBENI": ["MSHOMORONI", "PHILISTER KENYATTA", "MOMBASA"],
+  "JUNDA": ["MSHOMORONI", "PHILISTER KENYATTA", "MOMBASA"],
+  "MTOPANGA": ["BAMBURI", "PHILISTER KENYATTA", "MOMBASA"],
+  "KWA BULO": ["KWA BULO", "PHILISTER KENYATTA", "MOMBASA"],
+  "VIKWATANV": ["VIKWATANI", "PHILISTER KENYATTA", "MOMBASA"],
+  "MWAKIRUNGE": ["MSHOMORONI", "PHILISTER KENYATTA", "MOMBASA"],
+  "VIRUNGANI": ["MSHOMORONI", "PHILISTER KENYATTA", "MOMBASA"],
+  "KAJIWENI": ["MSHOMORONI", "PHILISTER KENYATTA", "MOMBASA"],
+  "MOMBASA CBD": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "TUDOR": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "MAJENGO - MOMBASA": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "KINGORANI": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "GANJONI": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "OLD TOWN": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "BONDENI - MOMBASA": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "SPARKI": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "MAKUPA": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "TONONOKA": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "LEBANON": ["MOMBASA CBD", "JANE ATIENO", "MOMBASA"],
+  "LIKONI": ["LIKONI", "SAMUEL JEFWA", "MOMBASA"],
+  "LUNGALUNGA - MOMBASA": ["LUNGA LUNGA", "JOHN OGOLA", "MOMBASA"],
+  "MTONGWE": ["LIKONI", "JOHN OGOLA", "MOMBASA"],
+  "SHIMONI": ["SHIMONI", "JOHN OGOLA", "MOMBASA"],
+  "SHIMBAHILLS": ["SIMBA HILLS", "JOHN OGOLA", "MOMBASA"],
+  "PERANI": ["LUNGA LUNGA", "JOHN OGOLA", "MOMBASA"],
+  "UJAMAA": ["UKUNDA", "JOHN OGOLA", "MOMBASA"],
+  "BAMBURI": ["BAMBURI", "DAVID OMOLLO", "MOMBASA"],
+  "KISAUNI": ["KISAUNI", "DAVID OMOLLO", "MOMBASA"],
+  "FISHERIES": ["FISHERIES", "DAVID OMOLLO", "MOMBASA"],
+  "MWEMBENI": ["BAMBURI", "DAVID OMOLLO", "MOMBASA"],
+  "BAKARANI": ["BAMBURI", "DAVID OMOLLO", "MOMBASA"],
+  "UTANGE": ["BAMBURI", "DAVID OMOLLO", "MOMBASA"],
+  "MLALEO": ["KISAUNI", "DAVID OMOLLO", "MOMBASA"],
+  "LAKE VIEW ESTATE": ["LAKE VIEW ESTATE", "DAVID OMOLLO", "MOMBASA"],
+  "MTAMBO": ["BAMBURI", "DAVID OMOLLO", "MOMBASA"],
+  "MWANDONI": ["MWANDONI", "DAVID OMOLLO", "MOMBASA"],
+  "BARSHEBA": ["KISAUNI", "DAVID OMOLLO", "MOMBASA"],
+  "BOMBOLULU": ["BOMBOLULU", "GEORGE CLINTON MASIWO", "MOMBASA"],
+  "NYALI": ["NYALI", "GEORGE CLINTON MASIWO", "MOMBASA"],
+  "KONGOWEA": ["KONGOWEA", "GEORGE CLINTON MASIWO", "MOMBASA"],
+  "MAWENI - MOMBASA": ["MAWENI", "GEORGE CLINTON MASIWO", "MOMBASA"],
+  "KARAMA": ["KONGOWEA", "GEORGE CLINTON MASIWO", "MOMBASA"],
+  "VOK": ["VOK", "GEORGE CLINTON MASIWO", "MOMBASA"],
+  "KISIMANI": ["BOMBOLULU", "GEORGE CLINTON MASIWO", "MOMBASA"],
+  "UKUNDA": ["UKUNDA", "MILICA MBEKE", "MOMBASA"],
+  "MSAMBWENI": ["LUNGA LUNGA", "MILICA MBEKE", "MOMBASA"],
+  "KOMBANI": ["UKUNDA", "MILICA MBEKE", "MOMBASA"],
+  "KWALE": ["KWALE", "MILICA MBEKE", "MOMBASA"],
+  "KINANGO": ["KINANGO", "MILICA MBEKE", "MOMBASA"],
+  "TIRIBE": ["KWALE", "MILICA MBEKE", "MOMBASA"],
+  "DIANI": ["UKUNDA", "MILICA MBEKE", "MOMBASA"],
+  "MAGONGO": ["MAGONGO", "SAMUEL MBATHA", "MOMBASA"],
+  "MIRITNI": ["MIRITINI", "SAMUEL MBATHA", "MOMBASA"],
+  "MIKINDANI": ["MIKINDANI", "SAMUEL MBATHA", "MOMBASA"],
+  "JOMVU": ["MAGONGO", "SAMUEL MBATHA", "MOMBASA"],
+  "MIGADINI": ["MAGONGO", "SAMUEL MBATHA", "MOMBASA"],
+  "CHANGAMWE": ["MAGONGO", "SAMUEL MBATHA", "MOMBASA"],
+  "ALDINA": ["MAGONGO", "SAMUEL MBATHA", "MOMBASA"],
+  "CHAANI": ["MAGONGO", "SAMUEL MBATHA", "MOMBASA"],
+  "VIKOBANI": ["VIKOBNI", "SAMUEL MBATHA", "MOMBASA"],
+  "JITONI": ["MAGONGO", "SAMUEL MBATHA", "MOMBASA"],
+  "MARIAKANI - MOMBASA": ["MARIAKANI", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "KALOLENI - MOMBASA": ["KALOLENI", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "MAZERAS": ["MAZERAS", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "BAMBA": ["MARIAKANI", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "MATANO MANNE": ["MARIAKANI", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "CHASIMBA": ["CHASIMBA", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "KOKOTONI": ["UKUNDA", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "GANZE": ["MARIAKANI", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "RABAI": ["RABAI", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "VITENGENI": ["MSHOMORONI", "JOSEPH BOB KAYAGO", "MOMBASA"],
+  "ENGINEER": ["Naivasha route", "JOHN MACHARIA", "NAIVASHA"],
+  "NDUNYU NJERU": ["Naivasha route", "JOHN MACHARIA", "NAIVASHA"],
+  "KIMENDE": ["Naivasha route", "JOHN MACHARIA", "NAIVASHA"],
+  "NJAMBINI": ["Naivasha route", "JOHN MACHARIA", "NAIVASHA"],
+  "FLYOVER": ["Naivasha route", "JOHN MACHARIA", "NAIVASHA"],
+  "MWENDANDU": ["Naivasha route", "JOHN MACHARIA", "NAIVASHA"],
+  "KWA HARAKA": ["Naivasha route", "JOHN MACHARIA", "NAIVASHA"],
+  "RWANYAMBO": ["Naivasha route", "JOHN MACHARIA", "NAIVASHA"],
+  "GWAKANYWA": ["Naivasha route", "JOHN MACHARIA", "NAIVASHA"],
+  "NAIVASHA": ["Naivasha CBD", "AMOS MACHIRA", "NAIVASHA"],
+  "GILGIL": ["GILGIL", "AMOS MACHIRA", "NAIVASHA"],
+  "KIKOPEY": ["KIKOPEY", "AMOS MACHIRA", "NAIVASHA"],
+  "MIHARATI": ["GILGIL", "AMOS MACHIRA", "OL KALOU"],
+  "RIRONI": ["GILGIL", "AMOS MACHIRA", "OL KALOU"],
+  "BUSH": ["GILGIL", "AMOS MACHIRA", "OL KALOU"],
+  "WANJOHI": ["GILGIL", "AMOS MACHIRA", "OL KALOU"],
+  "MAAI MAHIU": ["MAAI MAHIU", "GEORGE NJUGUNA", "NAIVASHA"],
+  "KAYOLE - NAIVASHA": ["Naivasha route", "GEORGE NJUGUNA", "NAIVASHA"],
+  "SUSWA": ["SUSWA ROUTE", "GEORGE NJUGUNA", "NAIVASHA"],
+  "KINANGOP": ["Naivasha route", "GEORGE NJUGUNA", "NAIVASHA"],
+  "KARAGITA": ["Naivasha route", "GEORGE NJUGUNA", "NAIVASHA"],
+  "KINAMBA - NAIVASHA": ["Naivasha route", "GEORGE NJUGUNA", "NAIVASHA"],
+  "DUKA MOJA": ["SUSWA ROUTE", "GEORGE NJUGUNA", "NAIVASHA"],
+  "KAMERE": ["Naivasha route", "GEORGE NJUGUNA", "NAIVASHA"],
+  "NAKURU CBD": ["NAKURU CBD", "ERICK NYAMWEYA", "NAKURU"],
+  "WHITE HOUSE": ["HESHIMA ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "LONDON": ["SHOWGROUND ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "KITI": ["KITI", "ERICK NYAMWEYA", "NAKURU"],
+  "KIRATINA": ["LANET ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "KIAMUNYI": ["KIAMUNYI/KABARAK ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "HESHIMA": ["HESHIMA/BAHATI", "ERICK NYAMWEYA", "NAKURU"],
+  "FREE AREA": ["PIPELINE ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "RAVINE": ["EDAMARAVINE ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "MOGOTIO CENTRE": ["RAVINE ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "KABARAK": ["KABARAK/KAMPI MOTO ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "EMINING": ["MARIGAT ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "MARIGAT": ["MARIGAT ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "KAMBI YA MOTO": ["RAVINE ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "MANGU": ["MANGU/KABARAK", "ERICK NYAMWEYA", "NAKURU"],
+  "RAFIKI - NAKURU": ["KABARAK KAMPI MOTO ROUTE", "ERICK NYAMWEYA", "NAKURU"],
+  "KABIMOI": ["KABIMOI", "ERICK NYAMWEYA", "NAKURU"],
+  "MILE SITA": ["BAHATI ROUTE", "FAITH MBINYA", "NAKURU"],
+  "SOLAI CENTER": ["SOLAI ROUTE", "FAITH MBINYA", "NAKURU"],
+  "MAILI KUMI": ["BAHATI ROUTE", "FAITH MBINYA", "NAKURU"],
+  "MAWANGA": ["HESHIMA ROUTE", "FAITH MBINYA", "NAKURU"],
+  "MARIAKANI - NAKURU": ["HESHIMA ROUTE", "FAITH MBINYA", "NAKURU"],
+  "KWA AMOS": ["KWA AMOS", "FAITH MBINYA", "NAKURU"],
+  "WANYORORO": ["SOLAI ROUTE", "FAITH MBINYA", "NAKURU"],
+  "KABATINI": ["HESHIMA/BAHATI ROUTE", "FAITH MBINYA", "NAKURU"],
+  "AHERO - NAKURU": ["BAHATI ROUTE", "FAITH MBINYA", "NAKURU"],
+  "NAROK CBD": ["NAROK ROUTE", "GEOFFREY OSEKO", "Arms Narok Wholesale"],
+  "OLOLUNGA": ["NAROK ROUTE", "GEOFFREY OSEKO", "Arms Narok Wholesale"],
+  "NTULELE": ["NAROK ROUTE", "GEOFFREY OSEKO", "Arms Narok Wholesale"],
+  "NAROOSURA": ["NAROK ROUTE", "GEOFFREY OSEKO", "Arms Narok Wholesale"],
+  "OLEKIRKIRAI": ["NAROK ROUTE", "GEOFFREY OSEKO", "Arms Narok Wholesale"],
+  "MONGARE": ["NAROK ROUTE", "GEOFFREY OSEKO", "Arms Narok Wholesale"],
+  "MOLO CENTRE": ["MOLO ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "NJORO CENTRE": ["MOLO ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "KERINGET": ["OLENGURUONE ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "OLENGURUONE": ["OLENGURUONE ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "SALGAA CENTRE": ["SALGAA ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "MAU NAROK": ["MAU NAROK", "MOLINTA ONYANGO", "NAKURU"],
+  "KIHINGO": ["MOLO", "MOLINTA ONYANGO", "NAKURU"],
+  "TIPIS": ["TIPIS", "GEOFFREY OSEKO", "NAKURU"],
+  "SEKUTON": ["MOLO ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "MAUCHE": ["MOLO ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "EGERTON-KIINGO": ["MOLO", "MOLINTA ONYANGO", "NAKURU"],
+  "KIPTAGICH": ["OLENGURUONE ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "SOBEA": ["SALGAA ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "ELBURGON": ["MOLO ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "MATHANGAUTA": ["MATHANGAUTA", "MOLINTA ONYANGO", "NAKURU"],
+  "MAKUTANO - NAKURU": ["TOTAL ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "LIKIA": ["LIKIA", "MOLINTA ONYANGO", "NAKURU"],
+  "KURESOI - NAKURU": ["OLENGURUONE ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "TURI": ["TURI", "MOLINTA ONYANGO", "NAKURU"],
+  "NESSUIT": ["MOLO ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "SACHORA": ["SACHORA", "MOLINTA ONYANGO", "NAKURU"],
+  "RONGAI - NAKURU": ["RONGAI", "MOLINTA ONYANGO", "NAKURU"],
+  "MWISHO WA LAMI": ["MAU NAROK ROUTE", "MOLINTA ONYANGO", "NAKURU"],
+  "KAPTEMBWA": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "NGAMBO": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "SHARBAB": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "LANGALANGA": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "NGATA": ["NGATA ROUTE", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "RHONDA": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "KENLANDS": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "BONDENI - NAKURU": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "MANYANI": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "BANGLADESH": ["KABARAK ROUTE", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "WEAVERS": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "PONDAMALI": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "KOLEN": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "KIPANGA": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "SEWAGE": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "RACE COURSE": ["NAKURU CBD", "JOY KALOKI/BEATRICE KIOKO", "NAKURU"],
+  "NYAHURURU CBD": ["NYAHURURU ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "MARALAL CENTRE": ["MARALAL ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "KINAMBA - NAKURU": ["MARALAL ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "SUBUKIA": ["NYAHURURU ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "RUMURUTI": ["MARALAL ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "MAILI NNE - NAKURU": ["MARALAL ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "OLJORO-OROK": ["OLJORO-OROK ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "KABAZI": ["NYAHURURU ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "SIPILI": ["NYAHURURU ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "RURII": ["RURII", "ROSE CHEPKORIR", "OL KALOU"],
+  "KANYOTU": ["NYAHURURU ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "KWA KUNGU": ["MARALAL ROUTE", "ROSE CHEPKORIR", "OL KALOU"],
+  "KIVORONJO": ["KIVORONJO", "ROSE CHEPKORIR", "OL KALOU"],
+  "OLKALOU CENTRE": ["LANET ROUTE", "SYLVIA LASOI", "OL KALOU"],
+  "DONDORI": ["OLKALAU ROUTE", "SYLVIA LASOI", "OL KALOU"],
+  "NDUNDORI": ["LANET ROUTES", "SYLVIA LASOI", "OL KALOU"],
+  "GWAKIONGO": ["BAHATI ROUTE", "SYLVIA LASOI", "OL KALOU"],
+  "PASSENGA": ["PASSENGA", "SYLVIA LASOI", "OL KALOU"],
+  "KIONDO": ["LANET ROUTE", "SYLVIA LASOI", "NAKURU"],
+  "LANET": ["LANET ROUTE", "SYLVIA LASOI", "NAKURU"],
+  "PIPELINE - NAKURU": ["WANYANA ROUTE", "SYLVIA LASOI", "NAKURU"],
+  "BARNABAS": ["PIPELINE ROUTE", "SYLVIA LASOI", "NAKURU"],
+  "KIPTANGWANY": ["NAKURU CBD", "SYLVIA LASOI", "NAKURU"],
+  "WANYAMA CENTER": ["WANYANA ROUTE", "SYLVIA LASOI", "NAKURU"],
+  "KONGASIS": ["NAKURU CBD", "SYLVIA LASOI", "NAKURU"],
+  "TEE": ["NAKURU CBD", "SYLVIA LASOI", "NAKURU"],
+  "KITALE CBD": ["KITALE CBD", "JOHN MWAI", "PHILTON"],
+  "KIMININI": ["KIMININI", "JOHN MWAI", "PHILTON"],
+  "KIBOMET": ["KITALE CBD", "JOHN MWAI", "PHILTON"],
+  "SIKHENDU": ["KIMININI", "JOHN MWAI", "PHILTON"],
+  "KIUNGANI": ["KIMININI", "JOHN MWAI", "PHILTON"],
+  "MALIKI": ["KIMININI", "JOHN MWAI", "PHILTON"],
+  "BIG TREE": ["KIMININI", "JOHN MWAI", "PHILTON"],
+  "MUCHARAGE": ["KIMININI", "JOHN MWAI", "PHILTON"],
+  "CHALICHA": ["KIMININI", "JOHN MWAI", "PHILTON"],
+  "NOREK": ["KITALE CBD", "JOHN MWAI", "PHILTON"],
+  "MAKUNGA - PHILTON": ["KITALE CBD", "JOHN MWAI", "PHILTON"],
+  "BARBATON": ["KIMININI", "JOHN MWAI", "PHILTON"],
+  "KAPCHEROP": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "SIBANGA": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "MAILI SABA": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "KAPSARA": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "MARAKWET - PHILTON": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "KAPLAMAI": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "KAPSAINA": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "TUIGOIN": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "CHEBARUS": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "KAPYEGO": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "ZIWA - PHILTON": ["KAPCHEROP", "DOUGLAS MUTURI", "PHILTON"],
+  "KOLONGOLO": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "ENDEBESS": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "MATISI": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "VETERINARY": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "KAPKOI": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "KWANZA": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "CHEPCHOINA": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "SABOTI": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "BIRUNDA": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "BONDENI - KITALE": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "KIPSONGO": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "GITWAMBA": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "TUWAN": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "MUROKI": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "MOLEM": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "LESSOS - PHILTON": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "LUKHOME": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "RAFIKI - PHILTON": ["KOLONGOLO", "WINNIE CHEPKWEMOI", "PHILTON"],
+  "MAKUTANO - PHILTON": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "ORTUM": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "KACHELIBA": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "SIGOR - PHILTON": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "UGANDA": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "LOMUT": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "BENDERA": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "CHEPARERIA": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "KASEI": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "ALALE": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "KAPENGURIA": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "KONYAO": ["MAKUTANO", "WESLEY KIPKOECH", "PHILTON"],
+  "MOIS BRIDGE": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "NAITIRI": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "BRIGADIER": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "NDALU": ["MOIS BRIDGE", "NJERI MARGARET WAIRU", "PHILTON"],
+  "PWANI": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "KONA MBAYA": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "TONGAREN": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "BIKEKE": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "SIRENDE": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "MUKUYUNI": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "GATUA": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "NYANGE": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "MATUNDA - PHILTON": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "KARIMA": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "NDIVISI": ["MOIS BRIDGE", "NJERI MARGARET WAIRIMU", "PHILTON"],
+  "KISERIAN": ["kiserian", "GLORIA KITIABI", "RONGAI"],
+  "NGONG - RONGAI WHOLESALE": ["NGONG", "GLORIA KITIABI", "RONGAI"],
+  "KWARE - RONGAI": ["NGONG", "GLORIA KITIABI", "RONGAI"],
+  "EMBULBUL": ["kiserian", "GLORIA KITIABI", "RONGAI"],
+  "GATAKA": ["rongai", "GLORIA KITIABI", "RONGAI"],
+  "RONGAI - RONGAI WHOLESALE": ["rongai", "VIVIAN AKIRU", "RONGAI"],
+  "LANGATA": ["langata", "VIVIAN AKIRU", "RONGAI"],
+  "SOUTH C": ["south c", "VIVIAN AKIRU", "RONGAI"],
+  "TWALA": ["rongai", "VIVIAN AKIRU", "RONGAI"],
+  "OLEKASASI": ["rongai", "VIVIAN AKIRU", "RONGAI"],
+  "KAREN - RONGAI": ["karen", "VIVIAN AKIRU", "RONGAI"],
+  "MAASAI LODGE": ["rongai", "VIVIAN AKIRU", "RONGAI"],
+  "NAIROBI WEST": ["nairobi west", "VIVIAN AKIRU", "RONGAI"],
+  "MAKONGENI": ["MAKONGENI ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "KIGANJO - THIKA": ["THIKA ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "MUGUGA": ["THIKA/KENOL ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "KISII - THIKA": ["THIKA/KENOL ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "LANDLESS": ["THIKA/KENOL ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "NDITHINI": ["WEITEITHIE ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "ITHANGA": ["WEITEITHIE ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "NGOLIBA": ["MAKONGENI ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "OLDONYO": ["MAKONGENI ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "KILIMAMBOGO": ["MAKONGENI ROUTE", "ELIZABETH WANJOGU", "THIKA"],
+  "THIKA": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "MAKUYU": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "KANGARI": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "KAYOLE - THIKA": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "MUNUNGA": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "KAMAHUHA": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "MUTHITHI": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "KIRERE": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "GACHOCHO": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "MANANJA": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "KINYONA": ["THIKA/KENOL ROUTE", "NANCY GAKII", "THIKA"],
+  "GATUNDU": ["GATUNDU", "NO FCRO", "THIKA"],
+  "JUJA": ["JUJA ROUTE", "NO FCRO", "THIKA"],
+  "KENYATTA ROAD": ["KENYATTA ROAD", "NO FCRO", "THIKA"],
+  "GATUKUYU": ["JUJA ROUTE", "NO FCRO", "THIKA"],
+  "GACHORORO": ["JUJA ROUTE", "NO FCRO", "THIKA"],
+  "KAMWANGI": ["JUJA ROUTE", "NO FCRO", "THIKA"],
+  "MANG'U - THIKA": ["JUJA ROUTE", "NO FCRO", "THIKA"],
+  "KENOL": ["THIKA/KENOL ROUTE", "LINET MORAA", "THIKA"],
+  "WITEITHIE": ["WEITEITHIE ROUTE", "LINET MORAA", "THIKA"],
+  "GITHUMU": ["WEITEITHIE ROUTE", "LINET MORAA", "THIKA"],
+  "KANDARA": ["WEITEITHIE ROUTE", "LINET MORAA", "THIKA"],
+  "KABATI - THIKA": ["THIKA/KENOL ROUTE", "LINET MORAA", "THIKA"],
+  "GATURA": ["KENOL ROUTE", "LINET MORAA", "THIKA"],
+  "GACHARAGE": ["WEITEITHIE ROUTE", "LINET MORAA", "THIKA"]
+};
+
+const OVERRIDES_KEY = 'routeOverrides';
+const ORIGINAL_TEMPLATE = JSON.parse(JSON.stringify(masterTemplate));
+
+function migrateOldSpOverrides() {
+  const old = JSON.parse(localStorage.getItem('spOverrides') || '{}');
+  if (Object.keys(old).length === 0) return;
+  const current = JSON.parse(localStorage.getItem(OVERRIDES_KEY) || '{}');
+  let migrated = 0;
+  for (const route in old) {
+    if (!current[route]) current[route] = {};
+    if (!current[route].sp && ORIGINAL_TEMPLATE[route]) {
+      current[route].sp = {
+        original: ORIGINAL_TEMPLATE[route][1],
+        override: old[route],
+        timestamp: new Date().toISOString(),
+        migrated: true
+      };
+      migrated++;
+    }
+  }
+  if (migrated > 0) {
+    localStorage.setItem(OVERRIDES_KEY, JSON.stringify(current));
+    localStorage.removeItem('spOverrides');
+    console.log(`[Overrides] Migrated ${migrated} old SP overrides to new format.`);
+  }
+}
+migrateOldSpOverrides();
+
+let routeOverrides = JSON.parse(localStorage.getItem(OVERRIDES_KEY) || '{}');
+
+function saveOverrides() {
+  localStorage.setItem(OVERRIDES_KEY, JSON.stringify(routeOverrides));
+  updateOverrideBadge();
+}
+
+function applyOverrides() {
+  for (const route in routeOverrides) {
+    if (!ORIGINAL_TEMPLATE[route]) continue;
+    const ov = routeOverrides[route];
+    if (ov.mainRoute) masterTemplate[route][0] = ov.mainRoute.override;
+    if (ov.sp) masterTemplate[route][1] = ov.sp.override;
+    if (ov.branch) masterTemplate[route][2] = ov.branch.override;
+  }
+}
+applyOverrides();
+
+function hasOverride(routeName) {
+  const ov = routeOverrides[routeName];
+  return !!(ov && (ov.mainRoute || ov.sp || ov.branch));
+}
+
+function getOverrideCount(routeName) {
+  const ov = routeOverrides[routeName];
+  if (!ov) return 0;
+  return ['mainRoute', 'sp', 'branch'].filter(f => ov[f]).length;
+}
+
+function getOverrideSummary(routeName) {
+  const ov = routeOverrides[routeName];
+  if (!ov) return '';
+  const parts = [];
+  if (ov.sp) parts.push(`SP: "${ov.sp.override}"`);
+  if (ov.mainRoute) parts.push(`Main: "${ov.mainRoute.override}"`);
+  if (ov.branch) parts.push(`Branch: "${ov.branch.override}"`);
+  return parts.join(' · ');
+}
+
+function setOverride(routeName, field, newValue) {
+  if (!ORIGINAL_TEMPLATE[routeName]) return false;
+  const idx = field === 'mainRoute' ? 0 : field === 'sp' ? 1 : 2;
+  const original = ORIGINAL_TEMPLATE[routeName][idx];
+  if (!routeOverrides[routeName]) routeOverrides[routeName] = {};
+  if (newValue === original) {
+    if (routeOverrides[routeName][field]) {
+      delete routeOverrides[routeName][field];
+      if (!routeOverrides[routeName].mainRoute && !routeOverrides[routeName].sp && !routeOverrides[routeName].branch) {
+        delete routeOverrides[routeName];
+      }
+    }
+  } else {
+    routeOverrides[routeName][field] = {
+      original: original,
+      override: newValue,
+      timestamp: new Date().toISOString()
+    };
+  }
+  applyOverrides();
+  saveOverrides();
+  return true;
+}
+
+function removeOverrideField(routeName, field) {
+  if (!routeOverrides[routeName] || !routeOverrides[routeName][field]) return false;
+  delete routeOverrides[routeName][field];
+  if (!routeOverrides[routeName].mainRoute && !routeOverrides[routeName].sp && !routeOverrides[routeName].branch) {
+    delete routeOverrides[routeName];
+  }
+  applyOverrides();
+  saveOverrides();
+  return true;
+}
+
+function removeAllRouteOverrides(routeName) {
+  if (!routeOverrides[routeName]) return false;
+  delete routeOverrides[routeName];
+  applyOverrides();
+  saveOverrides();
+  return true;
+}
+
+function clearAllOverrides() {
+  routeOverrides = {};
+  applyOverrides();
+  saveOverrides();
+}
+
+function updateOverrideBadge() {
+  const total = Object.keys(routeOverrides).length;
+  const countEl = $("ovmCount");
+  const modalCountEl = $("ovmModalCount");
+  if (countEl) {
+    countEl.textContent = total;
+    countEl.classList.toggle("zero", total === 0);
+  }
+  if (modalCountEl) modalCountEl.textContent = total;
+}
+
+const AUTO_REFRESH_MS = 600000, PAGE_SIZE = 100000, CHUNK_DAYS = 15;
+const S = {
+  sort: { key: "actual", dir: "desc" },
+  view: "routes",
+  loading: false,
+  abort: null,
+  routes: [],
+  branches: [],
+  filtered: [],
+  lastFetch: null,
+  fetchedRanges: []
+};
+const $ = id => document.getElementById(id);
+const fmt = n => {
+  n = Number(n) || 0;
+  return n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : Math.round(n).toLocaleString();
+};
+const fmtFull = n => "KES " + Math.round(Number(n) || 0).toLocaleString();
+const num = v => {
+  if (v == null || v === "") return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  const n = Number(String(v).replace(/,/g, "").replace(/%/g, "").trim());
+  return Number.isFinite(n) ? n : 0;
+};
+const fmtDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const parseDate = v => {
+  if (!v) return null;
+  const m = String(v).match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+};
+const inRange = (d, s, e) => !!d && d >= s && d <= e;
+const norm = n => String(n || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const normBranch = name => String(name || "").toUpperCase().replace(/BRANCH|WHOLESALE|PHILMED|ARMS/g, "").trim();
+const rangeDays = (s, e) => {
+  const sd = new Date(s + "T00:00:00"), ed = new Date(e + "T00:00:00");
+  if (isNaN(sd) || isNaN(ed)) return 30;
+  return Math.max(1, Math.round((ed - sd) / 864e5) + 1);
+};
+
+const getWorkingDaysExcludingSaturday = (s, e) => {
+  let count = 0;
+  const start = new Date(s + "T00:00:00"), end = new Date(e + "T00:00:00");
+  if (isNaN(start) || isNaN(end)) return 26;
+  let current = new Date(start);
+  while (current <= end) {
+    if (current.getDay() !== 6) { count++; }
+    current.setDate(current.getDate() + 1);
+  }
+  return Math.max(1, count);
+};
+
+const getRecordDate = r => parseDate(r.reportingDate || r.reportDate || r.salesDate || r.date || r.createdAt || r.updatedAt);
+const getRouteName = r => String(r.routeName || r.route_name || r.name || r.route || r.routeCode || r.route_code || "").trim();
+const getMainRoute = r => String(r.mainRoute || r.routeGroup || r.routeCategory || r.branchName || "").trim();
+const getSP = r => String(r.salesPersonName || r.salespersonName || r.salesPerson || r.salesRepName || r.salesRep || r.repName || r.fcroName || r.fcro || r.FCRO || r.agentName || r.routeOwner || r.routeSalesPerson || r.salesAgent || r.userName || r.createdBy || r.user || r.rep || r.owner || "Unassigned").trim();
+const getMonthlyTarget = r => num(r.monthlySalesTarget ?? r.monthlyTarget ?? r.target ?? r.salesTarget ?? (r.dailySalesTarget ? r.dailySalesTarget * 30 : 0));
+const getWeeklyTarget = r => num(r.weeklySales ?? r.weeklyTarget ?? (getMonthlyTarget(r) / 4.33));
+const getDailyTarget = r => num(r.dailySalesTarget ?? r.dailyTarget ?? (getMonthlyTarget(r) / 30));
+const getNetSales = r => num(r.dailyNetSales ?? r.daysNetSales ?? r.netDailySales ?? r.dayNetSales ?? r.netSales ?? r.branchNetSales ?? r.routeNetSales);
+const getOrders = r => num(r.totalDaysCustomers ?? r.dailyCustomers ?? r.customerOrders ?? r.totalCustomers);
+const getToday = () => new Date();
+const getDateRange = () => {
+  const preset = $("dateSelect").value, today = getToday(), endDate = fmtDate(today);
+  if (preset === "custom") {
+    let s = $("dateFrom").value || endDate, e = $("dateTo").value || endDate;
+    if (s > e) [s, e] = [e, s];
+    return { startDate: s, endDate: e };
+  }
+  if (preset === "yesterday") {
+    const d = new Date(today); d.setDate(d.getDate() - 1);
+    const ds = fmtDate(d);
+    return { startDate: ds, endDate: ds };
+  }
+  const dm = { today: 1, "7days": 7, "30days": 30, "90days": 90 }, days = dm[preset] || 1;
+  const s = new Date(today); s.setDate(s.getDate() - days + 1);
+  return { startDate: fmtDate(s), endDate };
+};
+
+const syncDateInputs = preset => {
+  const t = getToday(), ts = fmtDate(t);
+  let f = ts, to = ts;
+  if (preset === "yesterday") {
+    const y = new Date(t); y.setDate(y.getDate() - 1);
+    f = to = fmtDate(y);
+  } else if (preset === "7days") {
+    const d = new Date(t); d.setDate(d.getDate() - 6);
+    f = fmtDate(d);
+  } else if (preset === "30days") {
+    const d = new Date(t); d.setDate(d.getDate() - 29);
+    f = fmtDate(d);
+  } else if (preset === "90days") {
+    const d = new Date(t); d.setDate(d.getDate() - 89);
+    f = fmtDate(d);
+  } else if (preset === "custom") return;
+  $("dateFrom").value = f;
+  $("dateTo").value = to;
+};
+
+const toggleCustom = show => $("customDateRange").classList.toggle("visible", show);
+
+const branchNames = {
+  "orgbranch-683976e3994a072a600cbd7a": "Head Office",
+  "orgbranch-684558f576bd774c32f00d8e": "Naivasha",
+  "orgbranch-68455bea76bd774c32f031cc": "Kitengela",
+  "orgbranch-68458a4b76bd774c32f10527": "Githurai",
+  "orgbranch-684593b176bd774c32f150c6": "Kawangware Wholesale",
+  "orgbranch-685001107d3c6f75c8c1d42e": "Karatina",
+  "orgbranch-685001217d3c6f75c8c1d491": "Meru",
+  "orgbranch-6850012f7d3c6f75c8c1d4f4": "Busia",
+  "orgbranch-685001387d3c6f75c8c1d557": "Mombasa Wholesale",
+  "orgbranch-685001457d3c6f75c8c1d5ba": "Kisii",
+  "orgbranch-685001557d3c6f75c8c1d61d": "Philton",
+  "orgbranch-6850015d7d3c6f75c8c1d680": "Kitui Wholesale",
+  "orgbranch-685001667d3c6f75c8c1d6e3": "Philmed Malindi",
+  "orgbranch-685001967d3c6f75c8c1d746": "Kericho",
+  "orgbranch-6850019e7d6f75c8c1d7a9": "Nakuru",
+  "orgbranch-685001a77d3c6f75c8c1d80c": "Kisumu",
+  "orgbranch-685001b17d3c6f75c8c1d86f": "Philmed Eldoret",
+  "orgbranch-685001c17d3c6f75c8c1d8d2": "Philmed Thika",
+  "orgbranch-685001ce7d3c6f75c8c1d935": "Voi Branch",
+  "orgbranch-685001e27d3c6f75c8c1d998": "Kendia",
+  "orgbranch-685001f37d3c6f75c8c1d9fb": "Kakamega",
+  "orgbranch-685001ff7d3c6f75c8c1da5e": "Bungoma",
+  "orgbranch-685002097d3c6f75c8c1dac1": "Makindu",
+  "orgbranch-685002137d3c6f75c8c1db4f": "Rongai Wholesale",
+  "orgbranch-685002247d3c6f75c8c1dc25": "Embu",
+  "orgbranch-69df9dc58418a65253e015a6": "Arms Narok Wholesale",
+  "orgbranch-69f7511b83ba28b7dda7ccd1": "Ol Kalou",
+  "orgbranch-6a14177260c3a453acb56ceb": "Nanyuki",
+  "orgbranch-6a8c509e44cec8b9b30ec559": "Wote",
+  "orgbranch-6a840bfb1936a960f8ec3e7a": "Migori"
+};
+const getBranchNameFromRow = r => String(r.branchName || r.orgBranchName || branchNames[r.orgBranchId] || "").trim();
+const getBranchIdFromRow = r => r.orgBranchId || r.branchId || "";
+const getBranchIdByName = name => {
+  const n = String(name || "").trim().toLowerCase();
+  for (const [id, bn] of Object.entries(branchNames))
+    if (bn.toLowerCase() === n) return id;
+  return "";
+};
+const branchSelect = $("branchSelect");
+Object.entries(branchNames).sort((a, b) => a[1].localeCompare(b[1])).forEach(([id, name]) => {
+  const o = document.createElement("option");
+  o.value = id;
+  o.textContent = name;
+  branchSelect.appendChild(o);
+});
+
+let toastTimer = null;
+const showToast = (msg, type) => {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast" + (type ? " toast-" + type : "");
+  void t.offsetWidth;
+  t.classList.add("show");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 4500);
+};
+
+const abortPrev = () => {
+  if (S.abort) {
+    S.abort.abort();
+    S.abort = null;
+  }
+  S.abort = new AbortController();
+  return S.abort.signal;
+};
+
+async function fetchWithRetry(url, opts, retries = 3) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const r = await fetch(url, opts);
+      if ((r.status === 429 || r.status === 409) && i < retries) {
+        const d = Math.pow(2, i) * 1000 + Math.random() * 500;
+        showToast(`Rate limited — retrying in ${Math.round(d / 1000)}s...`, "retry");
+        await new Promise(r => setTimeout(r, d));
+        continue;
+      }
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return await r.json();
+    } catch (err) {
+      if (err.name === "AbortError") throw err;
+      if (i < retries) {
+        await new Promise(r => setTimeout(r, Math.pow(2, i) * 700 + Math.random() * 300));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+async function fetchAllByDateChunks(path, signal, startDate, endDate) {
+  const all = [];
+  let currentStart = new Date(startDate + "T00:00:00");
+  const end = new Date(endDate + "T00:00:00");
+  let chunkNum = 1;
+  while (currentStart <= end) {
+    let currentEnd = new Date(currentStart);
+    currentEnd.setDate(currentEnd.getDate() + (CHUNK_DAYS - 1));
+    if (currentEnd > end) currentEnd = new Date(end);
+    const sDateStr = fmtDate(currentStart);
+    const eDateStr = fmtDate(currentEnd);
+    let page = 1, chunkFirstRecord = null;
+    while (true) {
+      const url = `${window.API_CONFIG.API_URL}${path}?page=${page}&pageSize=${PAGE_SIZE}&startDate=${encodeURIComponent(sDateStr)}&endDate=${encodeURIComponent(eDateStr)}`;
+      const json = await fetchWithRetry(url, {
+        signal,
+        headers: {
+          
+          "Content-Type": "application/json"
+        }
+      });
+      let chunk = Array.isArray(json) ? json : (json.data || []);
+      if (chunk.length === 0) break;
+      const currentFirst = JSON.stringify(chunk[0]);
+      if (page > 1 && currentFirst === chunkFirstRecord) break;
+      if (page === 1) chunkFirstRecord = currentFirst;
+      all.push(...chunk);
+      if (chunk.length < PAGE_SIZE) break;
+      page++;
+      if (page > 10) break;
+    }
+    currentStart = new Date(currentEnd);
+    currentStart.setDate(currentStart.getDate() + 1);
+    chunkNum++;
+  }
+  return all;
+}
+
+const setLoading = (loading, silent = false) => {
+  S.loading = loading;
+  if (silent) return;
+  const ov = $("headerLoading");
+  ["dateSelect", "dateFrom", "dateTo", "branchSelect"].forEach(id => $(id).disabled = loading);
+  ov.classList.toggle("active", loading);
+};
+
+const showTableLoading = () => {
+  $("tableBody").innerHTML = `<tr class="loading-row"><td colspan="8"><span class="loading-spinner"></span> Loading route data...</td></tr>`;
+};
+
+function isRangeCached(start, end) {
+  const s = new Date(start + "T00:00:00").getTime(), e = new Date(end + "T00:00:00").getTime();
+  return S.fetchedRanges.some(r => s >= r.start && e <= r.end);
+}
+
+function addFetchedRange(start, end) {
+  const s = new Date(start + "T00:00:00").getTime(), e = new Date(end + "T00:00:00").getTime();
+  S.fetchedRanges.push({ start: s, end: e });
+  S.fetchedRanges.sort((a, b) => a.start - b.start);
+  const merged = [];
+  let current = S.fetchedRanges[0];
+  for (let i = 1; i < S.fetchedRanges.length; i++) {
+    const next = S.fetchedRanges[i];
+    if (current.end >= next.start - 1) current.end = Math.max(current.end, next.end);
+    else {
+      merged.push(current);
+      current = next;
+    }
+  }
+  merged.push(current);
+  S.fetchedRanges = merged;
+}
+
+function aggregateRoutes(startDate, endDate, selectedBranchId) {
+  const groups = new Map(), rDays = rangeDays(startDate, endDate), wDays = getWorkingDaysExcludingSaturday(startDate, endDate), lastTargets = {};
+  const selName = selectedBranchId ? (branchNames[selectedBranchId] || "") : "";
+
+  // Initialize empty groups for ALL routes in master template, completely ignoring the selected branch.
+  // This ensures actual sales and targets are fully aggregated independently of the branch filter.
+  for (const [tpl, [main, sp, branch]] of Object.entries(masterTemplate)) {
+    const key = `${branch.toLowerCase()}||${sp.toLowerCase()}||${tpl.toLowerCase()}`;
+    groups.set(key, {
+      branchName: branch,
+      salesPersonName: sp,
+      routeName: tpl,
+      mainRoute: main,
+      orgBranchId: getBranchIdByName(branch),
+      monthlyTarget: 0,
+      weeklyTarget: 0,
+      dailyTarget: 0,
+      netValue: 0,
+      orders: 0,
+      days: 0
+    });
+  }
+  const tplKeys = Object.keys(masterTemplate);
+
+  // Process all rows from the API, matching them to the master template.
+  // We ignore the branch ID provided by the API, and strictly use the route name to map the sales to the correct route.
+  for (const row of S.routes) {
+    const d = getRecordDate(row);
+    if (!inRange(d, startDate, endDate)) continue;
+
+    let branchId = getBranchIdFromRow(row), branchName = getBranchNameFromRow(row);
+    let routeName = getRouteName(row);
+    if (!routeName) continue;
+
+    let sp = getSP(row), mainRoute = getMainRoute(row);
+    const rk = norm(routeName);
+
+    let mk = tplKeys.find(k => norm(k) === rk);
+    if (!mk) {
+      const sn = rk.replace(/HQ$|HEADOFFICE$|PHILTON$|KENDIA$|BRANCH$/g, "");
+      mk = tplKeys.find(k => {
+        const sk = norm(k).replace(/HQ$|HEADOFFICE$|PHILTON$|KENDIA$|BRANCH$/g, "");
+        return sk === sn || sk.includes(sn) || sn.includes(sk);
+      });
+    }
+
+    if (mk) {
+      const t = masterTemplate[mk];
+      sp = t[1];
+      mainRoute = t[0];
+      branchName = t[2]; // Ensure the branch name comes strictly from the master template
+      routeName = mk;
+    }
+
+    // Capture targets and assign to the correct route key
+    const mt = getMonthlyTarget(row);
+    if (mt > 0) lastTargets[norm(routeName)] = mt;
+
+    const key = `${branchName.toLowerCase()}||${sp.toLowerCase()}||${routeName.toLowerCase()}`;
+    if (!groups.has(key)) groups.set(key, {
+      branchName,
+      salesPersonName: sp,
+      routeName,
+      mainRoute,
+      orgBranchId: branchId || getBranchIdByName(branchName),
+      monthlyTarget: 0,
+      weeklyTarget: 0,
+      dailyTarget: 0,
+      netValue: 0,
+      orders: 0,
+      days: 0
+    });
+
+    const g = groups.get(key);
+    g.monthlyTarget = mt > 0 ? mt : g.monthlyTarget;
+    g.weeklyTarget = getWeeklyTarget(row) > 0 ? getWeeklyTarget(row) : g.weeklyTarget;
+    g.dailyTarget = getDailyTarget(row) > 0 ? getDailyTarget(row) : g.dailyTarget;
+    g.netValue += getNetSales(row);
+    g.orders += getOrders(row);
+    g.days += 1;
+  }
+
+  // Map into final array structure
+  let result = [...groups.values()].map(g => {
+    const rk = norm(g.routeName);
+    const mt = g.monthlyTarget || lastTargets[rk] || 0;
+    const dt = g.dailyTarget > 0 ? g.dailyTarget : (mt > 0 ? mt / 30 : 0);
+    const rangeTarget = dt * wDays; // Range target is strictly Daily Target * Working Days (excl Saturdays)
+    return {
+      ...g,
+      monthlyTarget: mt,
+      weeklyTarget: mt / 4.33,
+      dailyTarget: dt,
+      rangeTarget,
+      score: rangeTarget > 0 ? (g.netValue / rangeTarget) * 100 : 0,
+      totalDaysCustomers: g.orders
+    };
+  });
+
+  // Apply Branch Filter AFTER aggregating all sales, so actual sales are independent of API branch grouping.
+  if (selName) {
+    const normSel = normBranch(selName);
+    result = result.filter(r => normBranch(r.branchName) === normSel);
+  }
+
+  return result;
+}
+
+const ID_KAWANGWARE = "orgbranch-684593b176bd774c32f150c6";
+const ID_RONGAI = "orgbranch-685002137d3c6f75c8c1db4f";
+const ID_KITENGEELA = "orgbranch-68455bea76bd774c32f031cc";
+const ID_KITUI = "orgbranch-6850015d7d3c6f75c8c1d680";
+
+function getTargetMultiplier(dateStr, branchId) {
+  const dateSelectVal = $("dateSelect").value;
+  const todayStr = fmtDate(getToday());
+  if (dateSelectVal !== "today" || dateStr !== todayStr) return 1;
+  const dateObj = new Date(dateStr + "T00:00:00");
+  const dayOfWeek = dateObj.getDay();
+  function isLastWeekdayOfMonth(date, targetDay) {
+    if (date.getDay() !== targetDay) return false;
+    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    return date.getDate() + 7 > lastDayOfMonth.getDate();
+  }
+  if (dayOfWeek === 2 && isLastWeekdayOfMonth(dateObj, 2) && branchId === ID_KITUI) return 1.5;
+  if (dayOfWeek === 3 && isLastWeekdayOfMonth(dateObj, 3) && branchId === ID_KAWANGWARE) return 1.5;
+  if (dayOfWeek === 5 && isLastWeekdayOfMonth(dateObj, 5) && (branchId === ID_KITENGEELA || branchId === ID_RONGAI)) return 1.5;
+  if (dayOfWeek === 4 && isLastWeekdayOfMonth(dateObj, 4)) {
+    if (![ID_KITUI, ID_KAWANGWARE, ID_KITENGEELA, ID_RONGAI].includes(branchId)) return 1.5;
+  }
+  if (dayOfWeek === 1) return 0.7;
+  if (dayOfWeek === 2) {
+    if (branchId === ID_KAWANGWARE || branchId === ID_RONGAI) return 0.6;
+    return 0.8;
+  }
+  if (dayOfWeek === 3) {
+    if (branchId === ID_KAWANGWARE || branchId === ID_RONGAI) return 0.8;
+    return 0.6;
+  }
+  if (dayOfWeek === 4) {
+    if (branchId === ID_KITENGEELA || branchId === ID_KAWANGWARE || branchId === ID_RONGAI) return 0.6;
+    return 0.8;
+  }
+  if (dayOfWeek === 5) {
+    if (branchId === ID_KAWANGWARE || branchId === ID_RONGAI || branchId === ID_KITENGEELA) return 0.8;
+    return 0.6;
+  }
+  if (dayOfWeek === 0) return 0.6;
+  return 1.0;
+}
+
+function aggregateBranches(startDate, endDate) {
+  const daily = new Map(), rDays = rangeDays(startDate, endDate), branchTargets = {};
+  const addDaily = (name, date, mt, ns, branchId) => {
+    if (!name || !date) return;
+    const k = `${name.toLowerCase().trim()}||${date}`;
+    if (!daily.has(k)) daily.set(k, { name, date, target: 0, netSales: 0, rawTarget: 0, monthlyTarget: 0 });
+    const d = daily.get(k);
+    const multiplier = getTargetMultiplier(date, branchId);
+    const dailyT = Number(mt) / 30 || 0;
+    d.target += dailyT * multiplier;
+    d.rawTarget += dailyT;
+    d.monthlyTarget = Number(mt) || d.monthlyTarget;
+    d.netSales += Number(ns) || 0;
+  };
+  for (const row of S.branches) {
+    const d = getRecordDate(row);
+    if (!inRange(d, startDate, endDate)) continue;
+    const name = String(row.orgBranchName || row.branchName || branchNames[row.orgBranchId] || "").trim();
+    if (!name) continue;
+    const mt = getMonthlyTarget(row);
+    if (mt > 0) branchTargets[name.toLowerCase().trim()] = mt;
+    addDaily(name, d, mt, getNetSales(row), row.orgBranchId || getBranchIdByName(name));
+  }
+  const routeDaily = new Map();
+  for (const row of S.routes) {
+    const d = getRecordDate(row);
+    if (!inRange(d, startDate, endDate)) continue;
+    const name = getBranchNameFromRow(row);
+    if (!name) continue;
+    const mt = getMonthlyTarget(row);
+    if (mt > 0) branchTargets[name.toLowerCase().trim()] = mt;
+    const branchId = getBranchIdFromRow(row);
+    const k = `${name.toLowerCase().trim()}||${d}`;
+    if (!routeDaily.has(k)) routeDaily.set(k, { name, date: d, monthlyTarget: mt, netSales: 0, branchId });
+    const rd = routeDaily.get(k);
+    rd.netSales += getNetSales(row);
+    if (!rd.monthlyTarget) rd.monthlyTarget = mt;
+  }
+  for (const [k, d] of routeDaily) if (!daily.has(k)) addDaily(d.name, d.date, d.monthlyTarget, d.netSales, d.branchId);
+  const groups = new Map();
+  for (const name of Object.values(branchNames)) groups.set(name.toLowerCase().trim(), { name, monthlyTarget: 0, target: 0, rawTarget: 0, netSales: 0, days: 0, hasData: false });
+  for (const d of daily.values()) {
+    const k = d.name.toLowerCase().trim();
+    if (!groups.has(k)) groups.set(k, { name: d.name, monthlyTarget: 0, target: 0, rawTarget: 0, netSales: 0, days: 0, hasData: false });
+    const g = groups.get(k);
+    g.monthlyTarget = Math.max(g.monthlyTarget, d.monthlyTarget);
+    g.target += d.target;
+    g.rawTarget += d.rawTarget;
+    g.netSales += d.netSales;
+    g.days += 1;
+    g.hasData = true;
+  }
+  return [...groups.values()].map(b => {
+    const mt = b.monthlyTarget || branchTargets[b.name.toLowerCase().trim()] || 0;
+    const target = b.target || mt * (rDays / 30);
+    const rawTarget = b.rawTarget || mt * (rDays / 30);
+    return {
+      ...b,
+      monthlyTarget: mt,
+      target,
+      rawTarget,
+      pct: target > 0 ? (b.netSales / target) * 100 : 0,
+      rawPct: rawTarget > 0 ? (b.netSales / rawTarget) * 100 : 0
+    };
+  });
+}
+
+async function loadAllData(silent = false) {
+  if (S.loading) return;
+  const signal = abortPrev();
+  setLoading(true, silent);
+  if (!silent && S.view === 'routes') showTableLoading();
+  try {
+    const { startDate, endDate } = getDateRange();
+    const [routeData, branchData] = await Promise.all([
+      fetchAllByDateChunks("routewise-sales-performance-reports", signal, startDate, endDate),
+      fetchAllByDateChunks("branch-sales-performance-reports", signal, startDate, endDate)
+    ]);
+    if (signal.aborted) return;
+    const getRowId = r => r._id || r.id || `${r.routeName}_${getRecordDate(r)}_${r.orgBranchId || r.branchId}`;
+    const routeMap = new Map();
+    S.routes.forEach(r => routeMap.set(getRowId(r), r));
+    routeData.forEach(r => routeMap.set(getRowId(r), r));
+    S.routes = Array.from(routeMap.values());
+    const getBranchRowId = r => r._id || r.id || `${r.orgBranchId}_${getRecordDate(r)}`;
+    const branchMap = new Map();
+    S.branches.forEach(r => branchMap.set(getBranchRowId(r), r));
+    branchData.forEach(r => branchMap.set(getBranchRowId(r), r));
+    S.branches = Array.from(branchMap.values());
+    addFetchedRange(startDate, endDate);
+    S.lastFetch = new Date();
+    processAndRender();
+    if (S.view === "branches") renderBranchView();
+    $("lastUpdated").textContent = S.lastFetch.toLocaleTimeString();
+  } catch (err) {
+    if (err.name === "AbortError") { console.log("[Aborted]"); return; }
+    console.error(err);
+    if (!silent) {
+      showToast("Failed to load data: " + err.message, "warn");
+      $("tableBody").innerHTML = `<tr class="no-data-row"><td colspan="8">Failed to load data. Please try again.</td></tr>`;
+    } else {
+      showToast("Background refresh failed: " + err.message, "warn");
+    }
+  } finally {
+    if (!signal.aborted) setLoading(false, silent);
+  }
+}
+
+function switchView(view) {
+  S.view = view;
+  const rv = $("routeView"), bv = $("branchView"), br = $("btnRoutes"), bb = $("btnBranches"), bsw = $("branchSelectorWrap"), ht = $("headerTitle"), hs = $("headerSubtitle");
+  if (view === "branches") {
+    rv.style.display = "none";
+    bv.style.display = "flex";
+    br.classList.remove("active");
+    bb.classList.add("active");
+    bsw.style.display = "none";
+    ht.textContent = "Branch Performance Dashboard";
+    hs.textContent = "All Branches — Real-time Route Performance Monitoring";
+    renderBranchView();
+  } else {
+    rv.style.display = "flex";
+    bv.style.display = "none";
+    br.classList.add("active");
+    bb.classList.remove("active");
+    bsw.style.display = "";
+    ht.textContent = "Routewise Performance Dashboard";
+    hs.textContent = "Management Overview — Master Template Clustering";
+    processAndRender();
+  }
+}
+
+function updateColumnHeaders() {
+  const preset = $("dateSelect").value, lbl = $("thTargetLabel");
+  if (!lbl) return;
+  const map = { today: "DAILY TARGET", yesterday: "DAILY TARGET", "7days": "WEEKLY TARGET", "30days": "MONTHLY TARGET", "90days": "QUARTERLY TARGET", custom: "RANGE TARGET" };
+  lbl.textContent = map[preset] || "RANGE TARGET";
+}
+
+function renderBranchView() {
+  if (!S.branches.length && !S.routes.length) {
+    $("branchGrid").innerHTML = '<div class="no-branch-data">No branch data available</div>';
+    return;
+  }
+  const { startDate, endDate } = getDateRange();
+  const agg = aggregateBranches(startDate, endDate);
+  const byName = new Map(agg.map(b => [b.name.toLowerCase().trim(), b]));
+  const allRoutes = aggregateRoutes(startDate, endDate, "");
+  const routesByBranch = new Map();
+  for (const r of allRoutes) {
+    const k = r.branchName.toLowerCase().trim();
+    if (!routesByBranch.has(k)) routesByBranch.set(k, { total: 0, onTrack: 0 });
+    const rb = routesByBranch.get(k);
+    rb.total++;
+    if (r.score >= 80) rb.onTrack++;
+  }
+  const branches = [];
+  for (const id in branchNames) {
+    const name = branchNames[id];
+    const e = byName.get(name.toLowerCase().trim());
+    const ri = routesByBranch.get(name.toLowerCase().trim()) || { total: 0, onTrack: 0 };
+    branches.push({
+      name,
+      target: e?.target || 0,
+      rawTarget: e?.rawTarget || 0,
+      netSales: e?.netSales || 0,
+      pct: e?.pct || 0,
+      rawPct: e?.rawPct || 0,
+      hasData: !!e?.hasData,
+      routeTotal: ri.total,
+      routeOnTrack: ri.onTrack
+    });
+  }
+  branches.sort((a, b) => {
+    if (a.hasData && !b.hasData) return -1;
+    if (!a.hasData && b.hasData) return 1;
+    if (!a.hasData && !b.hasData) return a.name.localeCompare(b.name);
+    return b.pct - a.pct;
+  });
+  const withData = branches.filter(b => b.hasData);
+  const totalNet = withData.reduce((s, b) => s + b.netSales, 0);
+  const totalTarget = withData.reduce((s, b) => s + b.target, 0);
+  const totalRawTarget = withData.reduce((s, b) => s + b.rawTarget, 0);
+  const overallPct = totalTarget > 0 ? (totalNet / totalTarget) * 100 : 0;
+  const overallRawPct = totalRawTarget > 0 ? (totalNet / totalRawTarget) * 100 : 0;
+  const totalRoutes = allRoutes.length;
+  const onTrack = allRoutes.filter(r => r.score >= 80).length;
+  const below = allRoutes.filter(r => r.score < 80).length;
+  const oc = overallPct >= 80 ? "perf-high" : overallPct >= 50 ? "perf-medium" : "perf-low";
+  $("bsOverallPct").textContent = overallPct.toFixed(1) + "%";
+  $("bsOverallPct").className = "stat-value " + oc;
+  $("bsTotalSales").textContent = "KES " + fmt(totalNet);
+  $("bsOnTrack").textContent = onTrack;
+  $("bsOnTrackSub").textContent = `of ${totalRoutes} routes at 80%+`;
+  const rawPerfClass = overallRawPct >= 80 ? "perf-high" : overallRawPct >= 50 ? "perf-medium" : "perf-low";
+  $("bsRawPerf").textContent = overallRawPct.toFixed(1) + "%";
+  $("bsRawPerf").className = "stat-value " + rawPerfClass;
+  $("bsRawPerfSub").textContent = "against original targets";
+  let html = "";
+  branches.forEach(b => {
+    const tier = !b.hasData ? "none" : b.pct >= 80 ? "high" : b.pct >= 50 ? "medium" : "low";
+    const bw = b.hasData ? Math.min(b.pct, 100).toFixed(1) : 0;
+    const riHTML = b.hasData && b.routeTotal > 0 ? `<div class="b-card-routes">${b.routeTotal} routes · ${b.routeOnTrack} on track</div>` : "";
+    const rawPctColor = !b.hasData ? "#64748b" : b.rawPct >= 80 ? "#22c55e" : b.rawPct >= 50 ? "#facc15" : "#ef4444";
+    const isSpecialDay = b.hasData && b.rawTarget > 0 && b.target !== b.rawTarget;
+    const isDouble = b.hasData && b.target > b.rawTarget;
+    let deficitHTML = '';
+    if (b.hasData) {
+      const specialDeficit = b.target - b.netSales;
+      const rawDeficit = b.rawTarget - b.netSales;
+      deficitHTML = '<div class="branch-deficit-info" style="margin-top:6px;font-size:11px;line-height:1.7;">';
+      if (isSpecialDay) {
+        if (specialDeficit > 0) {
+          deficitHTML += `Deficit (Special): <span style="color:#ef4444;font-weight:700;">${fmtFull(specialDeficit)}</span><br>`;
+        } else if (specialDeficit < 0) {
+          deficitHTML += `Surplus (Special): <span style="color:#22c55e;font-weight:700;">${fmtFull(Math.abs(specialDeficit))}</span><br>`;
+        }
+        if (rawDeficit > 0) {
+          deficitHTML += `Deficit (Raw): <span style="color:#ef4444;font-weight:700;">${fmtFull(rawDeficit)}</span>`;
+        } else if (rawDeficit < 0) {
+          deficitHTML += `Surplus (Raw): <span style="color:#22c55e;font-weight:700;">${fmtFull(Math.abs(rawDeficit))}</span>`;
+        }
+      } else {
+        if (specialDeficit > 0) {
+          deficitHTML += `Deficit: <span style="color:#ef4444;font-weight:700;">${fmtFull(specialDeficit)}</span>`;
+        } else if (specialDeficit < 0) {
+          deficitHTML += `Surplus: <span style="color:#22c55e;font-weight:700;">${fmtFull(Math.abs(specialDeficit))}</span>`;
+        }
+      }
+      deficitHTML += '</div>';
+    }
+    html += `<div class="b-card tier-${tier}" data-name="${b.name.toLowerCase()}">
+      <div class="b-card-name">${b.name}</div>
+      <div class="b-card-pct ${b.hasData ? "perf-" + tier : ""}">${b.hasData ? b.pct.toFixed(1) + "%" : "—"}</div>
+      ${riHTML}
+      <div class="b-card-detail">${b.hasData ? fmtFull(b.netSales) + " of " + fmtFull(b.target) : "No data available"}</div>
+      ${b.hasData && isSpecialDay ? `<div class="b-card-detail" style="margin-top:4px;font-size:11px;color:${isDouble ? '#ba9305' : '#38bdf8'};font-weight:700;">${isDouble ? 'DOUBLE GIFTING' : 'SPECIAL TARGET'} ACTIVE</div><div style="font-size:20px;font-weight:bold;color:${rawPctColor};margin-top:2px;">Actual Score: ${b.rawPct.toFixed(1)}%</div>` : (b.hasData ? `<div style="font-size:20px;font-weight:bold;color:${rawPctColor};margin-top:4px;">Actual Score: ${b.rawPct.toFixed(1)}%</div>` : "")}
+      ${deficitHTML}
+      <div class="b-card-bar"><div class="b-card-bar-fill bar-${tier}" style="width:${bw}%"></div></div>
+    </div>`;
+  });
+  $("branchGrid").innerHTML = html;
+  $("branchCount").textContent = withData.length + " branches";
+}
+
+function processAndRender() {
+  updateColumnHeaders();
+  const { startDate, endDate } = getDateRange();
+  const selBranch = branchSelect.value;
+  const selName = selBranch ? (branchNames[selBranch] || "") : "";
+  const processed = aggregateRoutes(startDate, endDate, selBranch);
+  const totalOrders = processed.reduce((s, r) => s + Number(r.totalDaysCustomers || 0), 0);
+  const activeCount = processed.length;
+  const selBranches = selBranch ? [selName] : Object.values(branchNames);
+  const branchAgg = aggregateBranches(startDate, endDate);
+  const selSet = new Set(selBranches.map(n => n.toLowerCase().trim()));
+  const relevant = branchAgg.filter(b => selSet.has(b.name.toLowerCase().trim()));
+  const bTarget = relevant.reduce((s, b) => s + b.target, 0);
+  const bRawTarget = relevant.reduce((s, b) => s + b.rawTarget, 0);
+  const bNet = relevant.reduce((s, b) => s + b.netSales, 0);
+  const bPct = bTarget > 0 ? (bNet / bTarget) * 100 : 0;
+  const bRawPct = bRawTarget > 0 ? (bNet / bRawTarget) * 100 : 0;
+  const deficit = bTarget - bNet;
+  const eighty = bTarget * 0.8;
+  const deficit80 = eighty - bNet;
+  $("statOrders").textContent = totalOrders.toLocaleString();
+  $("statOrdersSub").textContent = selBranch ? `from ${selName}` : "across all routes";
+  $("statActive").textContent = activeCount;
+  $("statActiveSub").textContent = selBranch ? `in ${selName}` : "including zero sales";
+  const dEl = $("statDeficit"), dL = $("deficitLabel"), dS = $("statDeficitSub");
+  if (deficit80 > 0) {
+    dL.textContent = "Deficit Below 80%";
+    dEl.className = "stat-value perf-low";
+    dEl.textContent = "KES " + fmt(deficit80);
+    dS.textContent = `to reach ${fmtFull(eighty)} (80% target)`;
+  } else {
+    dL.textContent = "Above 80% Target";
+    dEl.className = "stat-value perf-high";
+    dEl.textContent = "KES " + fmt(Math.abs(deficit80));
+    dS.textContent = "minimum threshold met";
+  }
+  const pc = bPct >= 80 ? "perf-high" : bPct >= 50 ? "perf-medium" : "perf-low";
+  const pEl = $("branchPerfValue");
+  pEl.textContent = bPct.toFixed(1) + "%";
+  pEl.className = "value " + pc;
+  const rawPctColor = bRawPct >= 80 ? "#22c55e" : bRawPct >= 50 ? "#facc15" : "#ef4444";
+  let dh = `${fmtFull(bNet)} of ${fmtFull(bTarget)} target<br>`;
+  if (bRawTarget > 0 && bTarget !== bRawTarget) {
+    const isDouble = bTarget > bRawTarget;
+    dh += `<div style="margin-top:8px; font-size:11px; font-weight:700; color:${isDouble ? '#ba9305' : '#38bdf8'}; text-transform:uppercase; letter-spacing:0.5px;">${isDouble ? 'DOUBLE GIFTING' : 'SPECIAL TARGET'} ACTIVE</div>`;
+    dh += `<div style="font-size:20px; font-weight:bold; color:${rawPctColor}; margin-top:4px;">Actual Score: ${bRawPct.toFixed(1)}% (Raw Target: ${fmtFull(bRawTarget)})</div><br>`;
+  } else {
+    dh += `<div style="font-size:20px; font-weight:bold; color:${rawPctColor}; margin-top:4px;">Actual Score: ${bRawPct.toFixed(1)}%</div><br>`;
+  }
+  const rawDeficit = bRawTarget - bNet;
+  if (deficit > 0) dh += `Deficit on Special Target: <span class="deficit">${fmtFull(deficit)}</span>`;
+  else if (deficit < 0) dh += `Surplus on Special Target: <span class="surplus">${fmtFull(Math.abs(deficit))}</span>`;
+  else dh += `<span class="surplus">Special Target met exactly</span>`;
+  dh += `<br>`;
+  if (rawDeficit > 0) dh += `Deficit on Raw Target: <span class="deficit">${fmtFull(rawDeficit)}</span>`;
+  else if (rawDeficit < 0) dh += `Surplus on Raw Target: <span class="surplus">${fmtFull(Math.abs(rawDeficit))}</span>`;
+  else dh += `<span class="surplus">Raw Target met exactly</span>`;
+  $("branchPerfDetail").innerHTML = dh;
+  const bar = $("branchPerfBar");
+  bar.style.width = Math.min(bPct, 100) + "%";
+  bar.style.background = bPct >= 80 ? "linear-gradient(90deg,#16a34a,#22c55e)" : bPct >= 50 ? "linear-gradient(90deg,#ca8a04,#facc15)" : "linear-gradient(90deg,#dc2626,#ef4444)";
+  $("marker50").className = bPct < 50 ? "active-marker" : "";
+  S.filtered = processed;
+  applySearchAndSort();
+}
+
+const getSortVal = (item, key) => {
+  switch (key) {
+    case "name": return (item.routeName || "").toLowerCase();
+    case "branch": return (item.mainRoute || "").toLowerCase();
+    case "sp": return (item.salesPersonName || "").toLowerCase();
+    case "target": return item.rangeTarget || 0;
+    case "daily": return item.dailyTarget;
+    case "actual": return item.netValue;
+    case "score": return item.score;
+    default: return 0;
+  }
+};
+
+function sortData(data) {
+  const { key, dir } = S.sort;
+  return [...data].sort((a, b) => {
+    const va = getSortVal(a, key), vb = getSortVal(b, key);
+    if (typeof va === "string") return dir === "asc" ? va.localeCompare(vb) : -va.localeCompare(vb);
+    return dir === "asc" ? va - vb : vb - va;
+  });
+}
+
+function applySearchAndSort() {
+  const q = $("searchBox").value.toLowerCase().trim();
+  let data = S.filtered;
+  if (q) data = data.filter(d => (d.routeName || "").toLowerCase().includes(q) || (d.branchName || "").toLowerCase().includes(q) || (d.salesPersonName || "").toLowerCase().includes(q));
+  renderTable(data);
+}
+
+function renderTable(data) {
+  const tbody = $("tableBody");
+  $("tableCount").textContent = data.length + (data.length === 1 ? " route" : " routes");
+  if (!data.length) {
+    tbody.innerHTML = `<tr class="no-data-row"><td colspan="8">No route data found for the selected range</td></tr>`;
+    return;
+  }
+  const grouped = {};
+  data.forEach(item => {
+    const b = item.branchName || "Unknown Branch", sp = item.salesPersonName || "Unassigned";
+    if (!grouped[b]) grouped[b] = {};
+    if (!grouped[b][sp]) grouped[b][sp] = [];
+    grouped[b][sp].push(item);
+  });
+  let html = "";
+  Object.keys(grouped).sort().forEach(branch => {
+    html += `<tr class="group-header branch-header"><td colspan="8">${branch}</td></tr>`;
+    Object.keys(grouped[branch]).sort().forEach(sp => {
+      const routes = grouped[branch][sp], sorted = sortData(routes);
+      let tRT = 0, tM = 0, tD = 0, tN = 0;
+      routes.forEach(r => {
+        tRT += r.rangeTarget || 0;
+        tM += r.monthlyTarget;
+        tD += r.dailyTarget;
+        tN += r.netValue;
+      });
+      const tScore = tRT > 0 ? (tN / tRT) * 100 : 0;
+      const oc = tScore >= 80 ? "perf-high" : tScore >= 50 ? "perf-medium" : "perf-low";
+      const sc = tScore >= 80 ? "status-on-track" : tScore >= 50 ? "status-at-risk" : "status-below";
+      const st = tScore >= 80 ? "ACHIEVED" : tScore >= 50 ? "AVERAGE" : "OFF TRACK";
+      sorted.forEach(item => {
+        const s = Number(item.score) || 0, v = Number(item.netValue) || 0;
+        const pc = s >= 80 ? "pct-high" : s >= 50 ? "pct-medium" : "pct-low";
+        const stc = s >= 80 ? "status-on-track" : s >= 50 ? "status-at-risk" : "status-below";
+        const stt = s >= 80 ? "ACHIEVED" : s >= 50 ? "AVERAGE" : "OFF TRACK";
+        html += `<tr class="route-row" data-route="${item.routeName}" style="cursor:pointer;">
+          <td class="route-name">${item.routeName}</td>
+          <td class="branch-cell">${item.mainRoute}</td>
+          <td class="sp-cell">${item.salesPersonName}</td>
+          <td style="text-align:center;"><span class="pct-badge ${pc}">${s.toFixed(1)}%</span></td>
+          <td class="value-cell">${fmt(item.rangeTarget || 0)}</td>
+          <td class="value-cell">${fmt(item.dailyTarget)}</td>
+          <td class="value-cell">${fmt(v)}</td>
+          <td style="text-align:center;"><span class="status-dot ${stc}">${stt}</span></td>
+        </tr>`;
+      });
+      html += `<tr class="group-subtotal">
+        <td colspan="3"><span class="sp-name">TOTAL (${sp})</span></td>
+        <td style="text-align:center;"><span class="pct-badge ${oc.replace('perf-', 'pct-')}">${tScore.toFixed(1)}%</span></td>
+        <td class="value-cell"><span class="kes">KES</span> ${fmt(tRT)}</td>
+        <td class="value-cell"><span class="kes">KES</span> ${fmt(tD)}</td>
+        <td class="value-cell"><span class="kes">KES</span> ${fmt(tN)}</td>
+        <td style="text-align:center;"><span class="status-dot ${sc}">${st}</span></td>
+      </tr>`;
+    });
+  });
+  tbody.innerHTML = html;
+}
+
+const sortLabels = { name: "Sales Route", branch: "Main Route", sp: "Sales Person", target: "Target", daily: "Daily Target", actual: "Actual Sales", score: "% Achievement" };
+
+function updateSortHeaders() {
+  document.querySelectorAll("thead th.sortable").forEach(th => {
+    const k = th.dataset.sort;
+    th.classList.remove("active-sort", "sort-asc", "sort-desc");
+    if (k === S.sort.key) th.classList.add("active-sort", S.sort.dir === "asc" ? "sort-asc" : "sort-desc");
+  });
+  $("sortHint").textContent = `Sorted by ${sortLabels[S.sort.key]} ${S.sort.dir === "asc" ? "↑" : "↓"}`;
+}
+
+document.querySelectorAll("thead th.sortable").forEach(th => {
+  th.addEventListener("click", () => {
+    const k = th.dataset.sort;
+    if (S.sort.key === k) S.sort.dir = S.sort.dir === "desc" ? "asc" : "desc";
+    else {
+      S.sort.key = k;
+      S.sort.dir = (["score", "actual", "target", "daily"].includes(k)) ? "desc" : "asc";
+    }
+    updateSortHeaders();
+    applySearchAndSort();
+  });
+});
+
+let editingRoute = null;
+ $("tableBody").addEventListener("dblclick", e => {
+  const row = e.target.closest("tr.route-row");
+  if (!row) return;
+  const routeName = row.getAttribute("data-route");
+  if (routeName) openEditRouteModal(routeName);
+});
+
+function openEditRouteModal(routeName) {
+  if (!ORIGINAL_TEMPLATE[routeName]) {
+    showToast(`Route "${routeName}" not found in template.`, "warn");
+    return;
+  }
+  editingRoute = routeName;
+  const original = ORIGINAL_TEMPLATE[routeName];
+  const current = masterTemplate[routeName];
+  const ov = routeOverrides[routeName] || {};
+  $("editRouteNameDisplay").textContent = routeName;
+  $("editMainRoute").value = current[0];
+  $("editMainRouteOriginal").textContent = `Original: ${original[0]}`;
+  $("editMainRoute").classList.toggle("has-override", !!ov.mainRoute);
+  $("editMainRouteFlag").innerHTML = ov.mainRoute ? `<span class="override-flag">OVERRIDDEN</span>` : "";
+  $("editSP").value = current[1];
+  $("editSPOriginal").textContent = `Original: ${original[1]}`;
+  $("editSP").classList.toggle("has-override", !!ov.sp);
+  $("editSPFlag").innerHTML = ov.sp ? `<span class="override-flag">OVERRIDDEN</span>` : "";
+  $("editBranch").value = current[2];
+  $("editBranchOriginal").textContent = `Original: ${original[2]}`;
+  $("editBranch").classList.toggle("has-override", !!ov.branch);
+  $("editBranchFlag").innerHTML = ov.branch ? `<span class="override-flag">OVERRIDDEN</span>` : "";
+  $("editRouteModal").classList.add("active");
+  setTimeout(() => $("editMainRoute").focus(), 100);
+}
+
+function closeEditRouteModal() {
+  $("editRouteModal").classList.remove("active");
+  editingRoute = null;
+}
+
+function saveRouteEdits() {
+  if (!editingRoute) return;
+  const route = editingRoute;
+  const newMain = $("editMainRoute").value.trim();
+  const newSP = $("editSP").value.trim();
+  const newBranch = $("editBranch").value.trim();
+  let changes = 0;
+  if (newMain) { setOverride(route, "mainRoute", newMain); changes++; }
+  if (newSP) { setOverride(route, "sp", newSP); changes++; }
+  if (newBranch) { setOverride(route, "branch", newBranch); changes++; }
+  closeEditRouteModal();
+  processAndRender();
+  if (S.view === "branches") renderBranchView();
+  if (changes > 0) {
+    const count = getOverrideCount(route);
+    showToast(`✓ ${route}: ${count} field(s) overridden. Persists across refresh.`, "success");
+  }
+}
+
+function openOverrideManager() {
+  $("ovmModal").classList.add("active");
+  renderOverrideList();
+  $("ovmSearch").value = "";
+  $("ovmSearch").focus();
+}
+
+function closeOverrideManager() {
+  $("ovmModal").classList.remove("active");
+}
+
+function renderOverrideList() {
+  const q = ($("ovmSearch")?.value || "").toLowerCase().trim();
+  const tbody = $("ovmTableBody");
+  const empty = $("ovmEmpty");
+  const statsEl = $("ovmStats");
+  const footerInfo = $("ovmFooterInfo");
+  const routes = Object.keys(routeOverrides).filter(r => routeOverrides[r] && (routeOverrides[r].mainRoute || routeOverrides[r].sp || routeOverrides[r].branch));
+  if (routes.length === 0) {
+    tbody.innerHTML = "";
+    empty.style.display = "block";
+    statsEl.innerHTML = "";
+    footerInfo.textContent = "No overrides. Double-click any route to edit.";
+    return;
+  }
+  empty.style.display = "none";
+  let entries = [];
+  for (const route of routes) {
+    const ov = routeOverrides[route];
+    if (ov.mainRoute) entries.push({ route, field: "mainRoute", ...ov.mainRoute });
+    if (ov.sp) entries.push({ route, field: "sp", ...ov.sp });
+    if (ov.branch) entries.push({ route, field: "branch", ...ov.branch });
+  }
+  if (q) {
+    entries = entries.filter(e => e.route.toLowerCase().includes(q) || e.original.toLowerCase().includes(q) || e.override.toLowerCase().includes(q));
+  }
+  entries.sort((a, b) => a.route.localeCompare(b.route) || a.field.localeCompare(b.field));
+  const spCount = entries.filter(e => e.field === "sp").length;
+  const mrCount = entries.filter(e => e.field === "mainRoute").length;
+  const brCount = entries.filter(e => e.field === "branch").length;
+  statsEl.innerHTML = `<div class="ovm-stat"><strong>${routes.length}</strong> routes</div><div class="ovm-stat"><strong>${entries.length}</strong> total overrides</div><div class="ovm-stat"><span class="ovm-field-tag sp">SP</span> <strong>${spCount}</strong></div><div class="ovm-stat"><span class="ovm-field-tag mainRoute">Main</span> <strong>${mrCount}</strong></div><div class="ovm-stat"><span class="ovm-field-tag branch">Branch</span> <strong>${brCount}</strong></div>`;
+  footerInfo.textContent = `${entries.length} override(s) on ${routes.length} route(s). All persist in localStorage.`;
+  const fieldLabels = { sp: "Sales Person", mainRoute: "Main Route", branch: "Branch" };
+  tbody.innerHTML = entries.map(e => {
+    const date = new Date(e.timestamp);
+    const dateStr = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const migrated = e.migrated ? ' <span style="color:#64748b;font-size:9px;">(migrated)</span>' : '';
+    return `<tr>
+      <td><span class="ovm-route-name">${e.route}</span></td>
+      <td><span class="ovm-field-tag ${e.field}">${fieldLabels[e.field]}</span></td>
+      <td><span class="ovm-value-old">${escapeHTML(e.original)}</span><span class="ovm-arrow">→</span><span class="ovm-value-new">${escapeHTML(e.override)}</span>${migrated}</td>
+      <td><span class="ovm-timestamp">${dateStr}</span></td>
+      <td style="text-align:right;">
+        <div class="ovm-actions">
+          <button class="ovm-action-btn" onclick="openEditRouteModal('${e.route.replace(/'/g, "\\'")}')" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+          <button class="ovm-action-btn danger" onclick="removeSingleOverride('${e.route.replace(/'/g, "\\'")}','${e.field}')" title="Remove this override"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function escapeHTML(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+function removeSingleOverride(route, field) {
+  removeOverrideField(route, field);
+  renderOverrideList();
+  processAndRender();
+  if (S.view === "branches") renderBranchView();
+  showToast(`Removed ${field} override for ${route}.`, "success");
+}
+
+function confirmClearAll() {
+  if (Object.keys(routeOverrides).length === 0) {
+    showToast("No overrides to clear.", "warn");
+    return;
+  }
+  if (confirm(`Remove ALL ${Object.keys(routeOverrides).length} route override(s)?\n\nThis cannot be undone. Consider exporting a JSON backup first.`)) {
+    const count = Object.keys(routeOverrides).length;
+    clearAllOverrides();
+    renderOverrideList();
+    processAndRender();
+    if (S.view === "branches") renderBranchView();
+    showToast(`✓ Cleared ${count} override(s). All routes restored to original values.`, "success");
+  }
+}
+
+function exportOverridesJSON() {
+  const routes = Object.keys(routeOverrides).filter(r => routeOverrides[r] && (routeOverrides[r].mainRoute || routeOverrides[r].sp || routeOverrides[r].branch));
+  if (routes.length === 0) {
+    showToast("No overrides to export.", "warn");
+    return;
+  }
+  const exportData = {
+    _meta: {
+      exportedAt: new Date().toISOString(),
+      exportedBy: "Routewise Performance Dashboard — Override Manager",
+      version: "1.0",
+      totalRoutes: routes.length,
+      totalOverrides: routes.reduce((s, r) => s + getOverrideCount(r), 0),
+      description: "Route assignment overrides backup. Import by saving to localStorage 'routeOverrides' key."
+    },
+    overrides: routeOverrides
+  };
+  const json = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `route-overrides-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`✓ Exported ${routes.length} route override(s) as JSON backup.`, "success");
+}
+
+function generateUpdatedJS() {
+  const routes = Object.keys(routeOverrides).filter(r => routeOverrides[r] && (routeOverrides[r].mainRoute || routeOverrides[r].sp || routeOverrides[r].branch));
+  if (routes.length === 0) {
+    showToast("No overrides to bake into JS. Apply overrides first.", "warn");
+    return;
+  }
+  const bakedTemplate = JSON.parse(JSON.stringify(ORIGINAL_TEMPLATE));
+  for (const route in routeOverrides) {
+    if (!bakedTemplate[route]) continue;
+    const ov = routeOverrides[route];
+    if (ov.mainRoute) bakedTemplate[route][0] = ov.mainRoute.override;
+    if (ov.sp) bakedTemplate[route][1] = ov.sp.override;
+    if (ov.branch) bakedTemplate[route][2] = ov.branch.override;
+  }
+  const changelog = [];
+  for (const route of routes) {
+    const ov = routeOverrides[route];
+    const original = ORIGINAL_TEMPLATE[route];
+    const baked = bakedTemplate[route];
+    const changes = [];
+    if (ov.mainRoute) changes.push(`mainRoute: "${original[0]}" → "${baked[0]}"`);
+    if (ov.sp) changes.push(`sp: "${original[1]}" → "${baked[1]}"`);
+    if (ov.branch) changes.push(`branch: "${original[2]}" → "${baked[2]}"`);
+    changelog.push(`//   • ${route}: ${changes.join(", ")}`);
+  }
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 19).replace("T", " ");
+  const totalRoutes = Object.keys(bakedTemplate).length;
+  const totalOverrides = routes.length;
+  const lines = [];
+  for (const route of Object.keys(bakedTemplate)) {
+    const [main, sp, branch] = bakedTemplate[route];
+    lines.push(`    ${JSON.stringify(route)}: [${JSON.stringify(main)},${JSON.stringify(sp)},${JSON.stringify(branch)}]`);
+  }
+  const templateStr = lines.join(",\n");
+  const jsContent = `// ============================================================\n// ROUTEWISE MASTER TEMPLATE — GENERATED WITH OVERRIDES BAKED IN\n// ============================================================\n// Generated:  ${dateStr} UTC\n// Total Routes:    ${totalRoutes}\n// Overrides Applied: ${totalOverrides}\n//\n// OVERRIDE CHANGELOG (${totalOverrides} route(s) modified):\n${changelog.join("\n")}\n// ============================================================\n\nconst masterTemplate = {\n${templateStr}\n  };\n`;
+  const blob = new Blob([jsContent], { type: "application/javascript" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `masterTemplate-with-overrides-${new Date().toISOString().slice(0, 10)}.js`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`✓ Generated JS with ${totalOverrides} override(s) baked into masterTemplate. Replace your source file to make permanent.`, "success");
+}
+
+let ovmSearchDebounce = null;
+document.addEventListener("DOMContentLoaded", () => {
+  const s = $("ovmSearch");
+  if (s) s.addEventListener("input", () => {
+    if (ovmSearchDebounce) clearTimeout(ovmSearchDebounce);
+    ovmSearchDebounce = setTimeout(renderOverrideList, 150);
+  });
+});
+ $("ovmModal").addEventListener("click", e => { if (e.target === $("ovmModal")) closeOverrideManager(); });
+ $("editRouteModal").addEventListener("click", e => { if (e.target === $("editRouteModal")) closeEditRouteModal(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    if ($("editRouteModal").classList.contains("active")) closeEditRouteModal();
+    else if ($("ovmModal").classList.contains("active")) closeOverrideManager();
+  }
+});
+
+function handleFilterChange() {
+  const { startDate, endDate } = getDateRange();
+  if (isRangeCached(startDate, endDate)) refreshFromCache();
+  else loadAllData(false);
+}
+
+function refreshFromCache() {
+  if (!S.routes.length && !S.branches.length) return;
+  processAndRender();
+  if (S.view === "branches") renderBranchView();
+}
+
+ $("dateSelect").addEventListener("change", () => {
+  const v = $("dateSelect").value;
+  if (v === "custom") {
+    toggleCustom(true);
+    if (!$("dateFrom").value && !$("dateTo").value) {
+      const ts = fmtDate(getToday());
+      $("dateFrom").value = ts;
+      $("dateTo").value = ts;
+    }
+    return;
+  }
+  toggleCustom(false);
+  syncDateInputs(v);
+  handleFilterChange();
+});
+
+function onCustomDateChange() {
+  if ($("dateSelect").value !== "custom") {
+    $("dateSelect").value = "custom";
+    toggleCustom(true);
+  }
+  const from = $("dateFrom").value, to = $("dateTo").value;
+  if (from && to) {
+    if (from > to) $("dateTo").value = from;
+    handleFilterChange();
+  }
+}
+ $("dateFrom").addEventListener("change", onCustomDateChange);
+ $("dateTo").addEventListener("change", onCustomDateChange);
+
+branchSelect.addEventListener("change", () => {
+  S.sort = { key: "actual", dir: "desc" };
+  updateSortHeaders();
+  refreshFromCache();
+});
+
+let searchDebounce = null;
+ $("searchBox").addEventListener("input", () => {
+  if (searchDebounce) clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(applySearchAndSort, 150);
+});
+
+ $("branchSearchBox").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase().trim();
+  document.querySelectorAll(".b-card").forEach(c => c.classList.toggle("hidden", q.length > 0 && !c.dataset.name.includes(q)));
+});
+
+(async () => {
+  syncDateInputs("today");
+  toggleCustom(false);
+  updateSortHeaders();
+  updateColumnHeaders();
+  updateOverrideBadge();
+  await loadAllData(false);
+  setInterval(() => { if (!S.loading) loadAllData(true); }, AUTO_REFRESH_MS);
+})();
+</script>
+</body>
+</html>
