@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Performance Display Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    background: #0f172a;
+    color: #e5e7eb;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 16px;
+    text-align: center;
+    font-size: 28px;
+    background: #ba9305;
+    color: #020617;
+  }
+
+  /* ========== TICKER BAR ========== */
+  #branchStats {
+    background: #1e293b;
+    overflow: hidden;
+    padding: 10px 0;
+    border-bottom: 2px solid #334155;
+    position: relative;
+  }
+
+  #branchStats::before,
+  #branchStats::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 80px;
+    z-index: 2;
+    pointer-events: none;
+  }
+  #branchStats::before {
+    left: 0;
+    background: linear-gradient(to right, #1e293b, transparent);
+  }
+  #branchStats::after {
+    right: 0;
+    background: linear-gradient(to left, #1e293b, transparent);
+  }
+
+  #branchTicker {
+    display: flex;
+    width: max-content;
+    animation: tickerScroll var(--ticker-duration, 25s) linear infinite;
+  }
+
+  #branchTicker:hover {
+    animation-play-state: paused;
+  }
+
+  .branch-card {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 210px;
+    height: 66px;
+    margin: 0 18px;
+    padding: 6px 28px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-left: 4px solid #475569;
+    position: relative;
+    transition: background 0.3s;
+  }
+
+  .branch-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .branch-card.accent-high   { border-left-color: #22c55e; }
+  .branch-card.accent-medium { border-left-color: #facc15; }
+  .branch-card.accent-low    { border-left-color: #ef4444; }
+
+  .branch-card .branch-name {
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 3px;
+    white-space: nowrap;
+  }
+
+  .branch-card .branch-perf {
+    font-size: 28px;
+    font-weight: bold;
+    line-height: 1;
+  }
+
+  .branch-card .branch-bar {
+    position: absolute;
+    bottom: 0;
+    left: 4px;
+    right: 0;
+    height: 3px;
+    border-radius: 0 0 6px 0;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+  }
+
+  .branch-card .branch-bar-fill {
+    height: 100%;
+    border-radius: 0 0 6px 0;
+    transition: width 0.8s ease;
+  }
+
+  .perf-high   { color: #22c55e; }
+  .perf-medium { color: #facc15; }
+  .perf-low    { color: #ef4444; }
+
+  .bar-high   { background: #22c55e; }
+  .bar-medium { background: #facc15; }
+  .bar-low    { background: #ef4444; }
+
+  @keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  /* ========== TABLE ========== */
+  .container {
+    flex: 1;
+    padding: 0 20px;
+    overflow: hidden;
+  }
+
+  .table-container {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .table-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 24px;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #1e293b;
+    color: #93c5fd;
+    text-transform: uppercase;
+    font-size: 15px;
+    z-index: 2;
+  }
+
+  th,
+  td {
+    padding: 14px;
+    border-bottom: 1px solid #334155;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  th:nth-child(1),
+  td:nth-child(1) {
+    width: 70px;
+    text-align: center;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: 35%;
+  }
+
+  th:nth-child(3),
+  td:nth-child(3) {
+    width: 25%;
+  }
+
+  th:nth-child(4),
+  td:nth-child(4) {
+    width: 20%;
+    text-align: center;
+  }
+
+  th:nth-child(5),
+  td:nth-child(5) {
+    width: 20%;
+    text-align: center;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #020617;
+  }
+
+  tbody tr:hover {
+    background: #1e293b;
+  }
+
+  .high   { color: #2563eb; }
+  .medium { color: #facc15; }
+  .low    { color: #ef4444; }
+
+  .rank {
+    color: #38bdf8;
+    font-weight: bold;
+    width: 60px;
+  }
+
+  footer {
+    text-align: center;
+    padding: 10px;
+    font-size: 14px;
+    background: #f8fafc;
+    color: #020617;
+  }
+</style>
+</head>
+
+<body>
+
+<header>Performance Display Dashboard</header>
+
+<div id="branchStats">
+  <div id="branchTicker"></div>
+</div>
+
+<div class="container">
+  <div class="table-container" id="scrollContainer">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Telesale Name</th>
+          <th>Branch</th>
+          <th>Sales (%)</th>
+          <th>Customer Orders</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="5">Loading data…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<footer>
+  Last updated: <span id="lastUpdated"></span><br>
+  Designed and Managed by MIS.DPT
+</footer>
+
+
+<script>
+  // Not a credential — proxy only accepts requests from this site's origin.
+  // The real API token lives ONLY in the Cloudflare worker's secrets.
+  window.API_CONFIG = {
+    API_URL: "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/pharma/"
+  };
+</script>
+
+<script>
+  let scrollInterval = null;
+  let pauseTimeout = null;
+
+  /* ---------- DATE RANGE ---------- */
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const formattedEnd = `${yyyy}-${mm}-${dd}`;
+
+  const pastDate = new Date();
+  pastDate.setDate(today.getDate() - 7);
+  const pastY = pastDate.getFullYear();
+  const pastM = String(pastDate.getMonth() + 1).padStart(2, '0');
+  const pastD = String(pastDate.getDate()).padStart(2, '0');
+  const formattedStart = `${pastY}-${pastM}-${pastD}`;
+
+  /* ---------- WHICH BRANCHES TO SHOW ---------- */
+  const allowedBranchIds = [
+    "orgbranch-683976e3994a072a600cbd7a", // Head Office
+    "orgbranch-684558f576bd774c32f00d8e", // Naivasha
+    "orgbranch-684593b176bd774c32f150c6", // Kawangware Wholesale
+    "orgbranch-6850012f7d3c6f75c8c1d4f4", // Busia
+    "orgbranch-6850015d7d3c6f75c8c1d680", // Kitui Wholesale
+    "orgbranch-685001a77d3c6f75c8c1d80c", // Kisumu
+    "orgbranch-685001c17d3c6f75c8c1d8d2", // Thika
+    "orgbranch-685001ce7d3c6f75c8c1d935", // Voi
+    "orgbranch-685001e27d3c6f75c8c1d998", // Kendia
+    "orgbranch-685001ff7d3c6f75c8c1da5e", // Bungoma
+    "orgbranch-68455bea76bd774c32f031cc", // Kitengela
+    "orgbranch-685002137d3c6f75c8c1db4f", // Rongai Wholesale
+    "orgbranch-685002097d3c6f75c8c1dac1", // Makindu
+    "orgbranch-68458a4b76bd774c32f10527"  // Githu Pharma
+  ];
+
+  const branchNames = {
+    "orgbranch-683976e3994a072a600cbd7a": "Head Office",
+    "orgbranch-684558f576bd774c32f00d8e": "Naivasha",
+    "orgbranch-68455bea76bd774c32f031cc": "Kitengela",
+    "orgbranch-68458a4b76bd774c32f10527": "Githurai",
+    "orgbranch-684593b176bd774c32f150c6": "Kawangware Wholesale",
+    "orgbranch-685001107d3c6f75c8c1d42e": "Karatina",
+    "orgbranch-685001217d3c6f75c8c1d491": "Meru",
+    "orgbranch-6850012f7d3c6f75c8c1d4f4": "Busia",
+    "orgbranch-685001387d3c6f75c8c1d557": "Mombasa Wholesale",
+    "orgbranch-685001457d3c6f75c8c1d5ba": "Kisii",
+    "orgbranch-685001557d3c6f75c8c1d61d": "Philton",
+    "orgbranch-6850015d7d3c6f75c8c1d680": "Kitui Wholesale",
+    "orgbranch-685001667d3c6f75c8c1d6e3": "Philmed Malindi",
+    "orgbranch-685001967d3c6f75c8c1d746": "Kericho",
+    "orgbranch-6850019e7d6f75c8c1d7a9": "Nakuru",
+    "orgbranch-685001a77d3c6f75c8c1d80c": "Kisumu",
+    "orgbranch-685001b17d3c6f75c8c1d86f": "Philmed Eldoret",
+    "orgbranch-685001c17d3c6f75c8c1d8d2": "Philmed Thika",
+    "orgbranch-685001ce7d3c6f75c8c1d935": "Voi Branch",
+    "orgbranch-685001e27d3c6f75c8c1d998": "Kendia",
+    "orgbranch-685001f37d3c6f75c8c1d9fb": "Kakamega",
+    "orgbranch-685001ff7d3c6f75c8c1da5e": "Bungoma",
+    "orgbranch-685002097d3c6f75c8c1dac1": "Makindu",
+    "orgbranch-685002137d3c6f75c8c1db4f": "Rongai Wholesale",
+    "orgbranch-685002247d3c6f75c8c1dc25": "Embu",
+    "orgbranch-69df9dc58418a65253e015a6": "Arms Narok Wholesale",
+    "orgbranch-69f7511b83ba28b7dda7ccd1": "Ol Kalou",
+    "orgbranch-6a14177260c3a453acb56ceb": "Nanyuki"
+  };
+
+  const allowedBranchNames = new Set(
+    allowedBranchIds.map(id => branchNames[id]).filter(Boolean)
+  );
+
+  /* ---------- PEOPLE TO HIDE FROM TABLE ---------- */
+  const hiddenSalesPeople = [
+    "Triphonia Wanza",
+    "Maronga Ombaso Benerd",
+    "Dennis Nyabuto Nyaberi"
+  ];
+
+  /*
+   * ── branchTargets REMOVED ─────────────────────────────────
+   * Ticker performance now comes from the
+   * branch-sales-performance-reports endpoint — no more
+   * manual calculation from salesperson data.
+   */
+
+  /* ---------- API CONFIG ---------- */
+  const BASE_API =
+    `${window.API_CONFIG.API_URL}sales-person-performance?pageSize=10000&startDate=${formattedEnd}&endDate=${formattedEnd}`;
+
+  
+
+  /* ── Branch performance data store (cached) ──────────────── */
+  let branchPerfData = [];
+
+  /* ── Match branch by name across the two endpoints ───────── */
+  function getBranchPerfByName(name) {
+    if (!name) return null;
+    const normalized = name.toLowerCase().trim();
+    return branchPerfData.find(d =>
+      (d.orgBranchName || "").toLowerCase().trim() === normalized
+    ) || null;
+  }
+
+  /* ===================== FETCH BRANCH PERFORMANCE ===================== */
+  async function fetchBranchPerformance() {
+    const url = `${window.API_CONFIG.API_URL}branch-sales-performance-reports`;
+
+    const res = await fetch(url, {
+      headers: {
+       
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!res.ok) throw new Error("Branch perf HTTP " + res.status);
+    const json = await res.json();
+
+    const dataArr = Array.isArray(json) ? json : (json.data || []);
+    if (dataArr.length > 0) {
+      console.log("%c[Branch Perf Sample]", "color:#ba9305;font-weight:bold", dataArr[0]);
+    }
+
+    return dataArr;
+  }
+
+  /* ===================== AUTO SCROLL TABLE ===================== */
+  function startAutoScroll() {
+    const c = document.getElementById("scrollContainer");
+
+    if (scrollInterval) clearInterval(scrollInterval);
+    if (pauseTimeout) clearTimeout(pauseTimeout);
+
+    if (c.scrollHeight <= c.clientHeight) return;
+
+    let direction = 1;
+    let isPaused = false;
+
+    scrollInterval = setInterval(() => {
+      if (isPaused) return;
+
+      c.scrollTop += direction * 2;
+
+      if (c.scrollTop >= c.scrollHeight - c.clientHeight && direction === 1) {
+        c.scrollTop = c.scrollHeight - c.clientHeight;
+        isPaused = true;
+        pauseTimeout = setTimeout(() => {
+          direction = -1;
+          isPaused = false;
+        }, 5000);
+      }
+
+      if (c.scrollTop <= 0 && direction === -1) {
+        c.scrollTop = 0;
+        isPaused = true;
+        pauseTimeout = setTimeout(() => {
+          direction = 1;
+          isPaused = false;
+        }, 5000);
+      }
+    }, 30);
+  }
+
+  /* ===================== FETCH PAGINATED DATA ===================== */
+  async function fetchPage(pageNum) {
+    const response = await fetch(`${BASE_API}&pageNum=${pageNum}`, {
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+
+    return await response.json();
+  }
+
+  /* ===================== BUILD TICKER ===================== */
+  function buildTicker() {
+    let cardsHTML = "";
+
+    allowedBranchIds.forEach(branchId => {
+      const name = branchNames[branchId];
+      if (!name) return;
+
+      const entry = getBranchPerfByName(name);
+
+      let performance = 0;
+      if (entry) {
+        /*
+         * ⚠️ Update this field name if your API uses
+         * a different one. Check the [Branch Perf Sample]
+         * console log to confirm.
+         */
+        performance = Number(entry.dailySalesScore || entry.performancePercentage || entry.dailyPerformance || 0);
+      } else {
+        console.warn(`[Ticker] "${name}" not found in branch performance data.`);
+      }
+
+      const tier =
+        performance >= 80 ? "high" :
+        performance >= 50 ? "medium" : "low";
+
+      const barWidth = Math.min(performance, 100).toFixed(1);
+
+      cardsHTML += `
+        <div class="branch-card accent-${tier}">
+          <span class="branch-name">${name}</span>
+          <span class="branch-perf perf-${tier}">${performance.toFixed(1)}%</span>
+          <div class="branch-bar">
+            <div class="branch-bar-fill bar-${tier}" style="width:${barWidth}%"></div>
+          </div>
+        </div>
+      `;
+    });
+
+    const ticker = document.getElementById("branchTicker");
+    ticker.innerHTML = cardsHTML + cardsHTML;
+
+    const singleSetWidth = allowedBranchIds.length * 246;
+    const duration = Math.max(12, singleSetWidth / 55);
+    ticker.style.setProperty("--ticker-duration", duration + "s");
+  }
+
+  /* ===================== LOAD ALL PAGES ===================== */
+  async function loadAllPages() {
+    try {
+      /* Fetch branch perf only if not cached yet */
+      if (branchPerfData.length === 0) {
+        branchPerfData = await fetchBranchPerformance();
+      }
+
+      /* Fetch salesperson data */
+      let allData = [];
+
+      const firstResponse = await fetchPage(0);
+      const pageCount = firstResponse.pageCount || 1;
+      allData.push(...(firstResponse.data || []));
+
+      const promises = [];
+      for (let i = 1; i < pageCount; i++) {
+        promises.push(fetchPage(i));
+      }
+
+      const responses = await Promise.all(promises);
+      responses.forEach(res => {
+        allData.push(...(res.data || []));
+      });
+
+      /* ---------- TICKER (now from branch API, not manual calc) ---------- */
+      buildTicker();
+
+      /* ---------- TABLE DATA ---------- */
+      const processed = allData
+        .map(d => {
+          let score = d.dailySalesScore;
+          if (typeof score === "string") {
+            score = score.replace("%", "");
+          }
+          score = Number(score);
+          return { ...d, score };
+        })
+        .filter(d => allowedBranchNames.has(d.branchName))
+        .filter(d => !isNaN(d.score) && d.score > 0)
+        .filter(d => !hiddenSalesPeople.includes(d.salesPersonName))
+        .sort((a, b) => b.score - a.score);
+
+      renderTable(processed);
+
+      document.getElementById("lastUpdated").textContent =
+        new Date().toLocaleTimeString();
+
+    } catch (err) {
+      console.error(err);
+      document.getElementById("tableBody").innerHTML =
+        `<tr><td colspan="5">Failed to load data</td></tr>`;
+    }
+  }
+
+  /* ===================== RENDER TABLE ===================== */
+  function renderTable(data) {
+    const tbody = document.getElementById("tableBody");
+
+    if (!data.length) {
+      tbody.innerHTML =
+        `<tr><td colspan="5">No sales Data Available</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = "";
+
+    data.forEach((item, index) => {
+      const sales = item.score;
+      const orders = Number(item.totalDaysCustomers || 0);
+      const cls =
+        sales >= 80 ? "high" :
+        sales >= 50 ? "medium" :
+        "low";
+
+      tbody.innerHTML += `
+        <tr>
+          <td class="rank">${index + 1}</td>
+          <td>${item.salesPersonName}</td>
+          <td>${item.branchName}</td>
+          <td class="${cls}">
+            ${sales.toFixed(1)}%
+          </td>
+          <td>${orders}</td>
+        </tr>
+      `;
+    });
+
+    document.getElementById("scrollContainer").scrollTop = 0;
+    startAutoScroll();
+  }
+
+  /* ===================== INIT ===================== */
+  loadAllPages();
+  setInterval(() => {
+    branchPerfData = [];
+    loadAllPages();
+  }, 120000);
+</script>
+
+</body>
+</html>
