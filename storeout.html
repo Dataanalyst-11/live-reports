@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live-Store Out Dashboard</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      background: #fefefe;
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Dashboard Header */
+    h2 {
+      background: #f004f4;
+      text-align: center;
+      margin: 0;
+      padding: 12px;
+      color: white;
+      top: 0;
+      z-index: 100;
+      font-weight: bold;
+      position: sticky;
+    }
+
+    /* Summary Bar */
+    #summary {
+      text-align: center;
+      background: #f889fa;
+      font-size: 1.2em;
+      padding: 8px;
+      margin: 0;
+      font-weight: bolder;
+      color: white;
+      position: sticky;
+      top: 52px;
+      z-index: 100;
+    }
+
+    /* Scrollable Table Section */
+    .table-container {
+      height: calc(100vh - 180px);
+      overflow-y: auto;
+      padding: 10px;
+      border-radius: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    /* Sticky Table Header */
+    thead th {
+      background-color: #f1f1f1;
+      color: #333;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      font-weight: bold;
+    }
+
+    tr:nth-child(even) { background-color: #fafafa; }
+
+    /* Row color coding based on elapsed time */
+    .green-row {
+      background-color: #006400 !important;
+      color: white;
+      font-weight: bold;
+    }
+    .yellow-row {
+      background-color: #FFD700 !important;
+      color: black;
+      font-weight: bold;
+    }
+    .red-row {
+      background-color: #8B0000 !important;
+      color: white;
+      font-weight: bold;
+    }
+
+    /* Timer text under time */
+    .timer {
+      display: block;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .status {
+      padding: 4px 8px;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      font-size: 12px;
+      display: inline-block;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 0.6em;
+      margin-top: 10px;
+      color: gray;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Dashboard Title -->
+  <h2>⚙️ Invoices Out of Store 📦</h2>
+
+  <!-- Summary Counter -->
+  <div id="summary">Total Invoices Out of Store: 0</div>
+
+  <!-- Scrollable Table -->
+  <div class="table-container">
+    <table id="invoiceTable">
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>STORE TIME OUT</th>
+          <th>Customer Name</th>
+          <th>Credit Terms</th>
+          <th>Route</th>
+          <th>Order Date</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    Last updated: <span id="lastUpdated"></span>
+   <div>Designed and Managed by MIS.DPT</div>
+  </div>
+
+  <script>
+  // Not a credential — proxy only accepts requests from this site's origin.
+  // The real API token lives ONLY in the Cloudflare worker's secrets.
+  window.API_CONFIG = {
+    API_URL: "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/pharma/"
+  };
+</script>
+
+  <script>
+    /* Build today's date */
+    let today = new Date();
+    let yyyy = today.getFullYear();
+    let mm = String(today.getMonth() + 1).padStart(2, '0');
+    let dd = String(today.getDate()).padStart(2, '0');
+    let formatted = `${yyyy}-${mm}-${dd}`;
+
+    /* Test range */
+    let testDate = "2025-10-01";
+    let testEndDate = "2025-11-04";
+
+    // Use central config instead of hardcoding
+    // Read branch ID dynamically from the URL, e.g. ?branch=orgbranch-12345
+      const urlParams = new URLSearchParams(window.location.search);
+      const branchId = urlParams.get('branch') || 'orgbranch-default'; // fallback if missing
+      // 🗺️ Optional: map of human-readable branch names
+       const branchNames = {
+       "orgbranch-683976e3994a072a600cbd7a": "Head Office",
+       "orgbranch-684558f576bd774c32f00d8e": "Naivasha",
+       "orgbranch-68455bea76bd774c32f031cc": "Kitengela",
+       "orgbranch-68458a4b76bd774c32f10527": "Githu Pharma",
+       "orgbranch-684593b176bd774c32f150c6": "Kawangware Wholesale",
+        "orgbranch-685001107d3c6f75c8c1d42e": "Karatina",
+       "orgbranch-685001217d3c6f75c8c1d491": "Meru",
+       "orgbranch-6850012f7d3c6f75c8c1d4f4": "Busia",
+       "orgbranch-685001387d3c6f75c8c1d557": "Mombasa Wholesale",
+       "orgbranch-685001457d3c6f75c8c1d5ba": "Kisii",
+       "orgbranch-685001557d3c6f75c8c1d61d": "Philton",
+       "orgbranch-6850015d7d3c6f75c8c1d680": "Kitui Wholesale",
+       "orgbranch-685001667d3c6f75c8c1d6e3": "Malindi",
+       "orgbranch-685001967d3c6f75c8c1d746": "Kericho",
+       "orgbranch-6850019e7d3c6f75c8c1d7a9": "Nakuru",
+        "orgbranch-685001a77d3c6f75c8c1d80c": "Kisumu",
+       "orgbranch-685001b17d3c6f75c8c1d86f": "Eldoret",
+       "orgbranch-685001c17d3c6f75c8c1d8d2": "Thika",
+       "orgbranch-685001ce7d3c6f75c8c1d935": "Voi",
+       "orgbranch-685001e27d3c6f75c8c1d998": "Kendia", 
+         "orgbranch-685001f37d3c6f75c8c1d9fb": "Kakamega",
+       "orgbranch-685001ff7d3c6f75c8c1da5e": "Bungoma",
+       "orgbranch-685002097d3c6f75c8c1dac1": "Makindu",
+       "orgbranch-685002137d3c6f75c8c1db4f": "Rongai Wholesale",
+       "orgbranch-685002247d3c6f75c8c1dc25": "Embu",
+       
+   // Add as many as you want
+  };
+
+// Use readable name if available
+const displayName = branchNames[branchId] || branchId;
+
+// 🧭 Display detected branch at top of dashboard
+const header = document.querySelector('h2');
+header.textContent += ` — [${displayName}]`;
+
+     const API_URL = `${window.API_CONFIG.API_URL}list?status=STORE_CHECKED_OUT&orgBranchId=${branchId}&startDate=${formatted}`;
+
+       // ================================
+    // Fetch API Data
+    // ================================
+    async function fetchInvoices() {
+      try {
+        const response = await fetch(API_URL, {
+          headers: {
+            
+            "Content-Type": "application/json"
+          }
+        });
+
+        const result = await response.json();
+
+        if (result.status && result.data) {
+          displayInvoices(result.data);
+          document.getElementById("lastUpdated").textContent =
+            new Date().toLocaleTimeString();
+        }
+      } catch (err) {
+        console.error("Fetch failed:", err);
+      }
+    }
+
+    /* Render Rows */
+    function displayInvoices(data) {
+      const tbody = document.querySelector("#invoiceTable tbody");
+      tbody.innerHTML = "";
+
+      document.getElementById("summary").textContent =
+        `Total Invoices Out of Store: ${data.length}`;
+
+      data.forEach(item => {
+        const row = document.createElement("tr");
+
+        // Using storeCheckedoutAt as STORE TIME OUT
+        const timeObj = new Date(item.storeCheckoutAt);
+
+        const diffMs = Date.now() - timeObj.getTime();
+        const diffMinutes = diffMs / 60000;
+
+        /* Row color logic */
+        if (diffMinutes <= 5) row.classList.add("green-row");
+        else if (diffMinutes <= 10) row.classList.add("yellow-row");
+        else row.classList.add("red-row");
+
+        const timeString = timeObj.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+
+        const timerId = `timer-${item.id}`;
+
+        /* Fully aligned row (Variable names as appearing id DB)*/
+        row.innerHTML = `
+          <td>${item.invoiceNumber}</td>
+
+          <td>
+            ${timeString}
+            <span class="timer" id="${timerId}"></span>
+          </td>
+
+          <td>${item.customerName}</td>
+
+          <td>${item.creditTerm.replace(/_/g, " ")}</td>
+
+          <td>${item.routeName}</td>
+
+         
+
+          <td>${timeObj.toLocaleDateString()}</td>
+        `;
+
+        tbody.appendChild(row);
+        startElapsedTimer(timerId, timeObj);
+      });
+
+    
+    }
+
+    /* Timer Under STORE TIME IN */
+    function startElapsedTimer(timerId, timeObj) {
+      function update() {
+        const diff = Date.now() - timeObj;
+        const mins = Math.floor(diff / 60000);
+        const hrs = Math.floor(mins / 60);
+
+        const elem = document.getElementById(timerId);
+        if (elem) elem.textContent = `Out of store for :${hrs}h ${mins % 60}m`;
+      }
+
+      update();
+      setInterval(update, 60000);
+     }
+
+      /* Bi-directional Smooth Auto Scroll */
+      let scrollInterval;
+
+      function startAutoScroll() {
+       const container = document.querySelector(".table-container");
+       clearInterval(scrollInterval);
+
+       if (container.scrollHeight <= container.clientHeight) return;
+
+       const speed = 40;      // scroll interval
+       const step = 1;        // pixel movement per tick (same for up & down)
+
+       let direction = 1;     // 1 = down, -1 = up, 0 = pause
+       let scrollTop = 0;
+
+       scrollInterval = setInterval(() => {
+         scrollTop += direction * step;
+
+         container.scrollTo({ top: scrollTop, behavior: "smooth" });
+
+         // reached bottom → pause 2 seconds → go up
+         if (scrollTop >= container.scrollHeight - container.clientHeight && direction === 1) {
+         direction = 0; // stop scrolling
+         setTimeout(() => {
+         direction = -1; // then go upward
+        }, 2000);
+      }
+
+     // reached top → go down again
+     if (scrollTop <= 0 && direction === -1) {
+      direction = 1; // start scrolling down
+      }
+     }, speed);
+    }
+
+
+     /* Auto-refresh every 30 seconds */
+      setInterval(fetchInvoices, 30000);
+
+    // Initial load + start scroll only once
+    fetchInvoices().then(() => startAutoScroll());
+
+  </script>
+
+</body>
+</html>
