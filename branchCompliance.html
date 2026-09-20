@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Branch Compliance Dashboard</title>
+
+<style>
+  :root {
+    --header-height: 0px;
+    --footer-height: 0px;
+  }
+
+  body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f9;
+    margin: 0;
+    padding-top: var(--header-height);
+    padding-bottom: var(--footer-height);
+  }
+
+  /* ===== FIXED DASHBOARD HEADER ===== */
+  .dashboard-header {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    background: #f4f6f9;
+    z-index: 1000;
+    padding: 15px 0 10px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .dashboard-header h2 {
+    margin: 0;
+  }
+
+  #clock {
+    font-size: 1rem;
+    margin-top: 6px;
+    color: #2c3e50;
+    font-weight: bolder;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+  }
+
+  th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+    font-weight: bolder;
+  }
+
+  /* Left-align only the first column (Branch) */
+   table th:first-child,
+   table td:first-child {
+   text-align: left;
+   padding-left: 16px;
+  }
+
+
+  th {
+    background: #1f4e79;
+    color: white;
+    position: sticky;
+    top: var(--header-height);
+    z-index: 500;
+  }
+
+  tr:nth-child(even) {
+    background: #f9f9f9;
+  }
+
+  tr:hover {
+    background: rgb(184, 184, 250);
+  }
+
+  /* ===== FIXED FOOTER ===== */
+  .footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #f4f6f9;
+    border-top: 1px solid #ddd;
+    text-align: center;
+    font-size: 14px;
+    padding: 6px 0;
+    font-weight: bolder;
+    color: gray;
+    z-index: 1000;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+</style>
+</head>
+
+<body>
+
+<!-- FIXED HEADER -->
+<div class="dashboard-header" id="dashboardHeader">
+  <h2>Branch Compliance Dashboard</h2>
+  <div id="clock"></div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Branch</th>
+      <th>Printed Invoices</th>
+      <th>In Store</th>
+      <th>Pending Confirmation</th>
+      <th>In Confirmation</th>
+      <th>Pending Dispatch</th>
+      <th>Pending Clearance</th>
+    </tr>
+  </thead>
+  <tbody id="dataBody"></tbody>
+</table>
+
+<!-- FIXED FOOTER -->
+<div class="footer" id="dashboardFooter">
+  Last updated: <span id="lastUpdated"></span>
+  <div>Designed and Managed by MIS.DPT</div>
+</div>
+
+<script>
+  // Proxy URLs only — real tokens live in the Cloudflare worker.
+  window.API_CONFIG = {
+    API_URL: "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/pharma/"
+  };
+</script>
+
+<script>
+/* ===============================
+   SET HEADER & FOOTER HEIGHTS
+   =============================== */
+function setLayoutHeights() {
+  const header = document.getElementById("dashboardHeader");
+  const footer = document.getElementById("dashboardFooter");
+
+  document.documentElement.style.setProperty(
+    "--header-height",
+    `${header.offsetHeight}px`
+  );
+
+  document.documentElement.style.setProperty(
+    "--footer-height",
+    `${footer.offsetHeight}px`
+  );
+}
+
+window.addEventListener("load", setLayoutHeights);
+window.addEventListener("resize", setLayoutHeights);
+
+/* ===============================
+   LIVE CLOCK
+   =============================== */
+function updateClock() {
+  const now = new Date();
+
+  const date = now.toLocaleDateString(undefined, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
+
+  const time = now.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+
+  document.getElementById("clock").textContent =
+    `${date} | ${time}`;
+}
+
+updateClock();
+setInterval(updateClock, 1000);
+
+/* ===============================
+   DATE RANGE (LAST 30 DAYS)
+   =============================== */
+const today = new Date();
+const end = today.toISOString().split("T")[0];
+const past = new Date();
+past.setDate(today.getDate() - 29);
+const start = past.toISOString().split("T")[0];
+
+const API_URL =
+  `${window.API_CONFIG.API_URL}invoice-count-by-status` +
+`?startDate=${start}&endDate=${end}`;
+
+
+
+/* ===============================
+   LOAD DASHBOARD DATA
+   =============================== */
+async function loadDashboard() {
+  const scrollPos = window.scrollY;
+
+  try {
+    const res = await fetch(API_URL, {
+      headers: {
+       
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const { data } = await res.json();
+    const tbody = document.getElementById("dataBody");
+    tbody.innerHTML = "";
+
+    data.forEach(b => {
+      const row = document.createElement("tr");
+      [
+        b.BRANCH_NAME,
+        b.ORDER_POSTED,
+        b.STORE_CHECKED_IN,
+        b.STORE_CHECKED_OUT,
+        b.ITEM_CONFIRMATION,
+        b.PENDING_DISPATCH,
+        b.IN_TRANSIT
+      ].forEach(val => {
+        const td = document.createElement("td");
+        td.textContent = val ?? 0;
+        row.appendChild(td);
+      });
+      tbody.appendChild(row);
+    });
+
+    document.getElementById("lastUpdated").textContent =
+      new Date().toLocaleString();
+
+  } catch (err) {
+    console.error("Data load failed:", err);
+  }
+
+  requestAnimationFrame(() => window.scrollTo(0, scrollPos));
+}
+
+loadDashboard();
+setInterval(loadDashboard, 60000);
+</script>
+
+<script>
+/* ===============================
+   TV-SAFE AUTO SCROLL WITH PAUSES
+   =============================== */
+
+let direction = 1;        // 1 = down, -1 = up
+let speed = 1;            // pixels per tick (TVs need larger steps)
+let paused = false;
+
+const TOP_PAUSE = 5000;    // 5 seconds
+const BOTTOM_PAUSE = 3000; // 3 seconds
+const TICK = 20;           // ms (50fps approx)
+
+function pauseScroll(ms) {
+  paused = true;
+  setTimeout(() => paused = false, ms);
+}
+
+setInterval(() => {
+  if (paused) return;
+
+  const maxScroll =
+    document.documentElement.scrollHeight - window.innerHeight;
+
+  const next = window.scrollY + direction * speed;
+
+  if (next >= maxScroll) {
+    direction = -1;
+    pauseScroll(BOTTOM_PAUSE);
+  } 
+  else if (next <= 0) {
+    direction = 1;
+    pauseScroll(TOP_PAUSE);
+  } 
+  else {
+    window.scrollTo(0, next);
+  }
+}, TICK);
+</script>
+
+
+</body>
+</html>
