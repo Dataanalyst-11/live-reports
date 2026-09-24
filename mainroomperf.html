@@ -97,6 +97,8 @@
     letter-spacing: 1.5px;
     margin-bottom: 3px;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
   }
 
   .branch-card .branch-perf {
@@ -129,6 +131,20 @@
   .bar-high   { background: #22c55e; }
   .bar-medium { background: #facc15; }
   .bar-low    { background: #ef4444; }
+
+  /* Target Badges */
+  .target-badge {
+    font-size: 8px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+  }
+  .target-badge.double { background: #ba9305; color: #020617; }
+  .target-badge.special { background: #38bdf8; color: #020617; }
 
   @keyframes tickerScroll {
     from { transform: translateX(0); }
@@ -352,18 +368,65 @@
     "Dennis Nyabuto Nyaberi"
   ];
 
-  /*
-   * ── branchTargets REMOVED ─────────────────────────────────
-   * Ticker performance now comes from the
-   * branch-sales-performance-reports endpoint — no more
-   * manual calculation from salesperson data.
-   */
+  /* ---------- SPECIAL TARGET & DOUBLE GIFTING LOGIC ---------- */
+  const ID_KAWANGWARE = "orgbranch-684593b176bd774c32f150c6";
+  const ID_RONGAI = "orgbranch-685002137d3c6f75c8c1db4f";
+  const ID_KITENGEELA = "orgbranch-68455bea76bd774c32f031cc";
+  const ID_KITUI = "orgbranch-6850015d7d3c6f75c8c1d680";
+
+  function getTargetMultiplier(dateStr, branchId) {
+    // Only apply for today's date
+    if (dateStr !== formattedEnd) return { multiplier: 1, type: "none" };
+
+    const dateObj = new Date(dateStr + "T00:00:00");
+    const dayOfWeek = dateObj.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+    function isLastWeekdayOfMonth(date, targetDay) {
+      if (date.getDay() !== targetDay) return false;
+      const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      return date.getDate() + 7 > lastDayOfMonth.getDate();
+    }
+
+    // 1. Check Double Gifting FIRST (Overrides Special Targets)
+    if (dayOfWeek === 2 && isLastWeekdayOfMonth(dateObj, 2) && branchId === ID_KITUI) return { multiplier: 1.5, type: "double" };
+    if (dayOfWeek === 3 && isLastWeekdayOfMonth(dateObj, 3) && branchId === ID_KAWANGWARE) return { multiplier: 1.5, type: "double" };
+    if (dayOfWeek === 5 && isLastWeekdayOfMonth(dateObj, 5) && (branchId === ID_KITENGEELA || branchId === ID_RONGAI)) return { multiplier: 1.5, type: "double" };
+    
+    if (dayOfWeek === 4 && isLastWeekdayOfMonth(dateObj, 4)) {
+      if (![ID_KITUI, ID_KAWANGWARE, ID_KITENGEELA, ID_RONGAI].includes(branchId)) return { multiplier: 1.5, type: "double" };
+    }
+
+    // 2. Check Special Targets
+    if (dayOfWeek === 1) return { multiplier: 0.7, type: "special" };
+
+    if (dayOfWeek === 2) {
+      if (branchId === ID_KAWANGWARE || branchId === ID_RONGAI) return { multiplier: 0.6, type: "special" };
+      return { multiplier: 0.8, type: "special" };
+    }
+
+    if (dayOfWeek === 3) {
+      if (branchId === ID_KAWANGWARE || branchId === ID_RONGAI) return { multiplier: 0.8, type: "special" };
+      return { multiplier: 0.6, type: "special" };
+    }
+
+    if (dayOfWeek === 4) {
+      if (branchId === ID_KITENGEELA || branchId === ID_KAWANGWARE || branchId === ID_RONGAI) return { multiplier: 0.6, type: "special" };
+      return { multiplier: 0.8, type: "special" };
+    }
+
+    if (dayOfWeek === 5) {
+      if (branchId === ID_KAWANGWARE || branchId === ID_RONGAI || branchId === ID_KITENGEELA) return { multiplier: 0.8, type: "special" };
+      return { multiplier: 0.6, type: "special" };
+    }
+
+    if (dayOfWeek === 0) return { multiplier: 0.6, type: "special" };
+
+    return { multiplier: 1.0, type: "none" };
+  }
 
   /* ---------- API CONFIG ---------- */
   const BASE_API =
     `${window.API_CONFIG.API_URL}sales-person-performance?pageSize=10000&startDate=${formattedEnd}&endDate=${formattedEnd}`;
-
-  
 
   /* ── Branch performance data store (cached) ──────────────── */
   let branchPerfData = [];
@@ -383,7 +446,6 @@
 
     const res = await fetch(url, {
       headers: {
-       
         "Content-Type": "application/json"
       }
     });
@@ -462,13 +524,19 @@
       const entry = getBranchPerfByName(name);
 
       let performance = 0;
+      let targetInfo = { multiplier: 1, type: "none" };
+
       if (entry) {
-        /*
-         * ⚠️ Update this field name if your API uses
-         * a different one. Check the [Branch Perf Sample]
-         * console log to confirm.
-         */
-        performance = Number(entry.dailySalesScore || entry.performancePercentage || entry.dailyPerformance || 0);
+        // Extract raw target and net sales
+        const rawTarget = Number(entry.dailySalesTarget || 0);
+        const netSales = Number(entry.netDailySales || 0);
+        
+        // Apply Special Target & Double Gifting multipliers for today
+        targetInfo = getTargetMultiplier(formattedEnd, branchId);
+        const adjustedTarget = rawTarget * targetInfo.multiplier;
+        
+        // Recalculate performance based on adjusted target
+        performance = adjustedTarget > 0 ? (netSales / adjustedTarget) * 100 : 0;
       } else {
         console.warn(`[Ticker] "${name}" not found in branch performance data.`);
       }
@@ -479,9 +547,14 @@
 
       const barWidth = Math.min(performance, 100).toFixed(1);
 
+      // Add visual badge if a special/double target is active
+      const badgeHTML = targetInfo.type !== "none" 
+        ? `<span class="target-badge ${targetInfo.type}">${targetInfo.type === 'double' ? 'DOUBLE' : 'SPECIAL'}</span>` 
+        : '';
+
       cardsHTML += `
         <div class="branch-card accent-${tier}">
-          <span class="branch-name">${name}</span>
+          <span class="branch-name">${name} ${badgeHTML}</span>
           <span class="branch-perf perf-${tier}">${performance.toFixed(1)}%</span>
           <div class="branch-bar">
             <div class="branch-bar-fill bar-${tier}" style="width:${barWidth}%"></div>
@@ -523,7 +596,7 @@
         allData.push(...(res.data || []));
       });
 
-      /* ---------- TICKER (now from branch API, not manual calc) ---------- */
+      /* ---------- TICKER (now applies special/double targets) ---------- */
       buildTicker();
 
       /* ---------- TABLE DATA ---------- */
