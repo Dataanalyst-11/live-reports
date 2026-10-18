@@ -71,7 +71,7 @@
     align-items: center;
     justify-content: center;
     min-width: 210px;
-    height: 78px; /* Slightly taller to fit target text */
+    height: 66px;
     margin: 0 18px;
     padding: 6px 28px;
     border-radius: 10px;
@@ -105,14 +105,6 @@
     font-size: 28px;
     font-weight: bold;
     line-height: 1;
-  }
-
-  .target-text {
-    font-size: 10px;
-    color: #64748b;
-    margin-top: 4px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
   }
 
   .branch-card .branch-bar {
@@ -302,31 +294,19 @@
   let scrollInterval = null;
   let pauseTimeout = null;
 
-  /* ---------- DATE HELPERS ---------- */
-  function formatDate(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-
+  /* ---------- DATE RANGE ---------- */
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
-  
-  const thisSunday = new Date(today);
-  thisSunday.setDate(today.getDate() - dayOfWeek);
-  thisSunday.setHours(0, 0, 0, 0);
-  
-  const lastSunday = new Date(thisSunday);
-  lastSunday.setDate(thisSunday.getDate() - 7);
-  
-  const lastFriday = new Date(lastSunday);
-  lastFriday.setDate(lastSunday.getDate() + 5);
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const formattedEnd = `${yyyy}-${mm}-${dd}`;
 
-  const formattedEnd = formatDate(today);
-  const formattedLWStart = formatDate(lastSunday);
-  const formattedLWEnd = formatDate(lastFriday);
-  const formattedTWStart = formatDate(thisSunday);
+  const pastDate = new Date();
+  pastDate.setDate(today.getDate() - 7);
+  const pastY = pastDate.getFullYear();
+  const pastM = String(pastDate.getMonth() + 1).padStart(2, '0');
+  const pastD = String(pastDate.getDate()).padStart(2, '0');
+  const formattedStart = `${pastY}-${pastM}-${pastD}`;
 
   /* ---------- WHICH BRANCHES TO SHOW ---------- */
   const allowedBranchIds = [
@@ -390,6 +370,62 @@
     "Dennis Nyabuto Nyaberi"
   ];
 
+  /* ---------- SPECIAL TARGET & DOUBLE GIFTING LOGIC ---------- */
+  const ID_KAWANGWARE = "orgbranch-684593b176bd774c32f150c6";
+  const ID_RONGAI = "orgbranch-685002137d3c6f75c8c1db4f";
+  const ID_KITENGEELA = "orgbranch-68455bea76bd774c32f031cc";
+  const ID_KITUI = "orgbranch-6850015d7d3c6f75c8c1d680";
+
+  function getTargetMultiplier(dateStr, branchId) {
+    // Only apply for today's date
+    if (dateStr !== formattedEnd) return { multiplier: 1, type: "none" };
+
+    const dateObj = new Date(dateStr + "T00:00:00");
+    const dayOfWeek = dateObj.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+    function isLastWeekdayOfMonth(date, targetDay) {
+      if (date.getDay() !== targetDay) return false;
+      const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      return date.getDate() + 7 > lastDayOfMonth.getDate();
+    }
+
+    // 1. Check Double Gifting FIRST (Overrides Special Targets)
+    if (dayOfWeek === 2 && isLastWeekdayOfMonth(dateObj, 2) && branchId === ID_KITUI) return { multiplier: 1.5, type: "double" };
+    if (dayOfWeek === 3 && isLastWeekdayOfMonth(dateObj, 3) && branchId === ID_KAWANGWARE) return { multiplier: 1.5, type: "double" };
+    if (dayOfWeek === 5 && isLastWeekdayOfMonth(dateObj, 5) && (branchId === ID_KITENGEELA || branchId === ID_RONGAI)) return { multiplier: 1.5, type: "double" };
+    
+    if (dayOfWeek === 4 && isLastWeekdayOfMonth(dateObj, 4)) {
+      if (![ID_KITUI, ID_KAWANGWARE, ID_KITENGEELA, ID_RONGAI].includes(branchId)) return { multiplier: 1.5, type: "double" };
+    }
+
+    // 2. Check Special Targets
+    if (dayOfWeek === 1) return { multiplier: 0.7, type: "special" };
+
+    if (dayOfWeek === 2) {
+      if (branchId === ID_KAWANGWARE || branchId === ID_RONGAI) return { multiplier: 0.6, type: "special" };
+      return { multiplier: 0.8, type: "special" };
+    }
+
+    if (dayOfWeek === 3) {
+      if (branchId === ID_KAWANGWARE || branchId === ID_RONGAI) return { multiplier: 0.8, type: "special" };
+      return { multiplier: 0.6, type: "special" };
+    }
+
+    if (dayOfWeek === 4) {
+      if (branchId === ID_KITENGEELA || branchId === ID_KAWANGWARE || branchId === ID_RONGAI) return { multiplier: 0.6, type: "special" };
+      return { multiplier: 0.8, type: "special" };
+    }
+
+    if (dayOfWeek === 5) {
+      if (branchId === ID_KAWANGWARE || branchId === ID_RONGAI || branchId === ID_KITENGEELA) return { multiplier: 0.8, type: "special" };
+      return { multiplier: 0.6, type: "special" };
+    }
+
+    if (dayOfWeek === 0) return { multiplier: 0.6, type: "special" };
+
+    return { multiplier: 1.0, type: "none" };
+  }
+
   /* ---------- API CONFIG ---------- */
   const BASE_API =
     `${window.API_CONFIG.API_URL}sales-person-performance?pageSize=10000&startDate=${formattedEnd}&endDate=${formattedEnd}`;
@@ -401,18 +437,14 @@
   function getBranchPerfByName(name) {
     if (!name) return null;
     const normalized = name.toLowerCase().trim();
-    return branchPerfData.find(d => {
-      const bName = (d.orgBranchName || d.branchName || "").toLowerCase().trim();
-      let dateStr = d.reportingDate || d.reportDate || d.salesDate || d.date || "";
-      dateStr = String(dateStr).substring(0, 10);
-      return bName === normalized && dateStr === formattedEnd;
-    }) || null;
+    return branchPerfData.find(d =>
+      (d.orgBranchName || "").toLowerCase().trim() === normalized
+    ) || null;
   }
 
   /* ===================== FETCH BRANCH PERFORMANCE ===================== */
   async function fetchBranchPerformance() {
-    // Fetch from last week sunday to today to cover incentive calculations
-    const url = `${window.API_CONFIG.API_URL}branch-sales-performance-reports?startDate=${formattedLWStart}&endDate=${formattedEnd}&pageSize=10000`;
+    const url = `${window.API_CONFIG.API_URL}branch-sales-performance-reports`;
 
     const res = await fetch(url, {
       headers: {
@@ -483,115 +515,49 @@
     return await response.json();
   }
 
-  /* ===================== INCENTIVE DATA CALCULATION ===================== */
-  function aggregateBranchData(rows, startDate, endDate) {
-    const groups = {};
-    rows.forEach(row => {
-      let dateStr = row.reportingDate || row.reportDate || row.salesDate || row.date || row.createdAt;
-      if (!dateStr) return;
-      dateStr = String(dateStr).substring(0, 10);
-      if (dateStr < startDate || dateStr > endDate) return;
-
-      const name = (row.orgBranchName || row.branchName || "").trim();
-      if (!name) return;
-
-      if (!groups[name]) groups[name] = { name, target: 0, netSales: 0 };
-      
-      const target = Number(row.dailySalesTarget || row.salesTarget || row.target || 0);
-      const netSales = Number(row.netDailySales || row.netSales || 0);
-      
-      groups[name].target += target;
-      groups[name].netSales += netSales;
-    });
-    
-    const result = {};
-    Object.values(groups).forEach(g => {
-      result[g.name.toLowerCase()] = {
-        name: g.name,
-        target: g.target,
-        netSales: g.netSales,
-        pct: g.target > 0 ? (g.netSales / g.target) * 100 : 0
-      };
-    });
-    return result;
-  }
-
-  function calculateIncentiveData() {
-    if (!branchPerfData || branchPerfData.length === 0) return {};
-    
-    const lwAgg = aggregateBranchData(branchPerfData, formattedLWStart, formattedLWEnd);
-    const twAgg = aggregateBranchData(branchPerfData, formattedTWStart, formattedEnd);
-    
-    const incentiveData = {};
-    const allNames = new Set([
-      ...Object.keys(lwAgg),
-      ...Object.keys(twAgg)
-    ]);
-    
-    allNames.forEach(name => {
-      const lw = lwAgg[name];
-      const tw = twAgg[name];
-      
-      if (!lw || lw.target <= 0) return;
-      if (!tw || tw.target <= 0) return;
-      
-      const lwPct = lw.pct;
-      let increment = 0;
-      
-      if (lwPct > 50) increment = 10;
-      else if (lwPct >= 45) increment = 15;
-      else increment = 20;
-      
-      const incentivePct = lwPct + increment;
-      
-      incentiveData[name] = {
-        lastWeekPct: lwPct,
-        incentivePct: incentivePct,
-        thisWeekTarget: tw.target,
-        thisWeekNetSales: tw.netSales,
-        thisWeekPct: tw.pct
-      };
-    });
-    
-    return incentiveData;
-  }
-
   /* ===================== BUILD TICKER ===================== */
   function buildTicker() {
     let cardsHTML = "";
-    const incentiveData = calculateIncentiveData();
 
     allowedBranchIds.forEach(branchId => {
       const name = branchNames[branchId];
       if (!name) return;
 
-      const incData = incentiveData[name.toLowerCase().trim()];
+      const entry = getBranchPerfByName(name);
 
-      let currentPerf = 0;
-      let targetPerf = 0;
-      let tier = "low";
+      let performance = 0;
+      let targetInfo = { multiplier: 1, type: "none" };
 
-      if (incData) {
-        currentPerf = incData.thisWeekPct;
-        targetPerf = incData.incentivePct;
+      if (entry) {
+        // Extract raw target and net sales
+        const rawTarget = Number(entry.dailySalesTarget || 0);
+        const netSales = Number(entry.netDailySales || 0);
         
-        // Determine tier based on progress towards the incentive target
-        if (currentPerf >= targetPerf) {
-          tier = "high"; // Green (Achieved)
-        } else if (currentPerf >= targetPerf * 0.8) {
-          tier = "medium"; // Yellow (Close)
-        } else {
-          tier = "low"; // Red (Far)
-        }
+        // Apply Special Target & Double Gifting multipliers for today
+        targetInfo = getTargetMultiplier(formattedEnd, branchId);
+        const adjustedTarget = rawTarget * targetInfo.multiplier;
+        
+        // Recalculate performance based on adjusted target
+        performance = adjustedTarget > 0 ? (netSales / adjustedTarget) * 100 : 0;
+      } else {
+        console.warn(`[Ticker] "${name}" not found in branch performance data.`);
       }
 
-      const barWidth = Math.min(currentPerf, 100).toFixed(1);
+      const tier =
+        performance >= 80 ? "high" :
+        performance >= 50 ? "medium" : "low";
+
+      const barWidth = Math.min(performance, 100).toFixed(1);
+
+      // Add visual badge if a special/double target is active
+      const badgeHTML = targetInfo.type !== "none" 
+        ? `<span class="target-badge ${targetInfo.type}">${targetInfo.type === 'double' ? 'DOUBLE' : 'SPECIAL'}</span>` 
+        : '';
 
       cardsHTML += `
         <div class="branch-card accent-${tier}">
-          <span class="branch-name">${name}</span>
-          <span class="branch-perf perf-${tier}">${currentPerf.toFixed(0)}%</span>
-          <span class="target-text">Target: ${targetPerf.toFixed(0)}%</span>
+          <span class="branch-name">${name} ${badgeHTML}</span>
+          <span class="branch-perf perf-${tier}">${performance.toFixed(1)}%</span>
           <div class="branch-bar">
             <div class="branch-bar-fill bar-${tier}" style="width:${barWidth}%"></div>
           </div>
@@ -602,7 +568,7 @@
     const ticker = document.getElementById("branchTicker");
     ticker.innerHTML = cardsHTML + cardsHTML;
 
-    const singleSetWidth = allowedBranchIds.length * 246; 
+    const singleSetWidth = allowedBranchIds.length * 246;
     const duration = Math.max(12, singleSetWidth / 55);
     ticker.style.setProperty("--ticker-duration", duration + "s");
   }
@@ -632,7 +598,7 @@
         allData.push(...(res.data || []));
       });
 
-      /* ---------- TICKER ---------- */
+      /* ---------- TICKER (now applies special/double targets) ---------- */
       buildTicker();
 
       /* ---------- TABLE DATA ---------- */
