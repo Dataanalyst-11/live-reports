@@ -6,7 +6,7 @@
 <title>Telesales Deficit Report</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #e5e7eb; min-height: 100vh; display: flex; flex-direction: column; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #e5e7eb; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   header { background: linear-gradient(135deg, #0f172a, #1e293b); border-bottom: 3px solid #ba9305; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
   .header-left { display: flex; align-items: center; gap: 20px; }
   .logo { width: 44px; height: 44px; background: #ba9305; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; color: #020617; }
@@ -59,6 +59,24 @@
     .header-right, .filter-select, .filter-select select, .search { width: 100%; }
     td, thead th { padding: 12px; font-size: 13px; }
   }
+
+  /* ── Wall panel mode ── */
+  .title { font-size: clamp(24px, 2vw, 40px); }
+  .subtitle { font-size: clamp(13px, 1vw, 20px); }
+  .table-title { font-size: clamp(24px, 2vw, 40px); }
+  .count { font-size: clamp(16px, 1.3vw, 26px); }
+  .table-section { padding: 16px 32px 12px; }
+  .table-wrap { scrollbar-width: none; scroll-behavior: auto; }
+  .table-wrap::-webkit-scrollbar { display: none; }
+  thead th { font-size: clamp(18px, 1.6vw, 32px); padding: 22px 28px; cursor: default; color: #ba9305; }
+  thead th:hover { color: #ba9305; }
+  td { font-size: clamp(26px, 2.6vw, 52px); padding: 22px 28px; }
+  tbody tr:nth-child(even) { background: rgba(30,41,59,.45); }
+  th:nth-child(1), td:nth-child(1) { width: 38%; }
+  th:nth-child(2), td:nth-child(2) { width: 30%; }
+  th:nth-child(3), td:nth-child(3) { width: 32%; }
+  .msg td { font-size: clamp(22px, 2vw, 40px); }
+  footer { padding: 10px; }
 </style>
 </head>
 <body>
@@ -97,17 +115,16 @@
   <div class="table-header">
     <div class="table-title">Telesales Deficit</div>
     <div class="tools">
-      <input class="search" id="searchBox" placeholder="Search name or branch...">
       <span class="count" id="count">0 people</span>
     </div>
   </div>
-  <div class="table-wrap">
+  <div class="table-wrap" id="tableWrap">
     <table>
       <thead>
         <tr>
-          <th data-sort="name">Telesales Name <span class="arrow"></span></th>
-          <th data-sort="branch">Branch <span class="arrow"></span></th>
-          <th data-sort="deficit">Deficit <span class="arrow"></span></th>
+          <th>Telesales Name</th>
+          <th>Branch</th>
+          <th>Deficit</th>
         </tr>
       </thead>
       <tbody id="tableBody">
@@ -131,7 +148,6 @@ const LOOKBACK_DAYS = 365;
 const MIN_TARGET = 100000; // hard floor on each telesale's calculated target (KES)
 
 let allRawData = [], branchPerfData = [], rows = [];
-let sort = { key: "deficit", dir: "desc" };
 let isLoading = false, abortCtrl = null;
 
 /* ── Branches ─────────────────────────────────────────────── */
@@ -317,21 +333,12 @@ function computeRows() {
 
 /* ── Render ───────────────────────────────────────────────── */
 function render() {
-  const q = $("searchBox").value.toLowerCase().trim();
-  let data = rows.filter(r => !q || r.name.toLowerCase().includes(q) || r.branch.toLowerCase().includes(q));
-  const { key, dir } = sort;
-  data = [...data].sort((a, b) => {
-    const va = a[key], vb = b[key];
-    const c = typeof va === "string" ? va.localeCompare(vb) : va - vb;
-    return dir === "asc" ? c : -c;
-  });
-
+  // Strictly Branch A-Z, then Telesales name A-Z
+  const data = [...rows].sort((a, b) =>
+    a.branch.localeCompare(b.branch, undefined, { sensitivity: "base" }) ||
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
   $("count").textContent = data.length + (data.length === 1 ? " person" : " people");
-  document.querySelectorAll("thead th").forEach(th => {
-    const active = th.dataset.sort === key;
-    th.classList.toggle("active", active);
-    th.querySelector(".arrow").textContent = active ? (dir === "asc" ? "↑" : "↓") : "";
-  });
 
   const tbody = $("tableBody");
   if (!data.length) { tbody.innerHTML = `<tr class="msg"><td colspan="3">No telesales data found for the selected range</td></tr>`; return; }
@@ -378,13 +385,6 @@ async function loadAllData() {
 }
 
 /* ── Events ───────────────────────────────────────────────── */
-document.querySelectorAll("thead th").forEach(th => th.addEventListener("click", () => {
-  const key = th.dataset.sort;
-  if (sort.key === key) sort.dir = sort.dir === "desc" ? "asc" : "desc";
-  else sort = { key, dir: key === "deficit" ? "desc" : "asc" };
-  render();
-}));
-
 $("dateSelect").addEventListener("change", () => {
   const v = $("dateSelect").value;
   $("customRange").classList.toggle("visible", v === "custom");
@@ -400,8 +400,26 @@ $("dateFrom").addEventListener("change", onCustomChange);
 $("dateTo").addEventListener("change", onCustomChange);
 branchSelect.addEventListener("change", refresh);
 
-let debounce;
-$("searchBox").addEventListener("input", () => { clearTimeout(debounce); debounce = setTimeout(render, 150); });
+/* ── Wall-panel auto scroll ───────────────────────────────── */
+const SCROLL_SPEED = 45;   // pixels per second (raise to scroll faster)
+const END_PAUSE_MS = 5000; // pause at bottom and at top
+let scrollPos = 0, lastTs = 0, pausedUntil = 0, atBottom = false;
+function autoScroll(ts) {
+  const w = $("tableWrap");
+  const max = w.scrollHeight - w.clientHeight;
+  const dt = Math.min((ts - (lastTs || ts)) / 1000, 0.1);
+  lastTs = ts;
+  if (max > 0 && ts >= pausedUntil) {
+    if (atBottom) { scrollPos = 0; w.scrollTop = 0; atBottom = false; pausedUntil = ts + END_PAUSE_MS; }
+    else {
+      scrollPos = Math.max(scrollPos, w.scrollTop) + SCROLL_SPEED * dt;
+      if (scrollPos >= max) { scrollPos = max; atBottom = true; pausedUntil = ts + END_PAUSE_MS; }
+      w.scrollTop = scrollPos;
+    }
+  } else if (max <= 0) { scrollPos = 0; }
+  requestAnimationFrame(autoScroll);
+}
+requestAnimationFrame(autoScroll);
 
 /* ── Init ─────────────────────────────────────────────────── */
 syncDateInputs("today");
