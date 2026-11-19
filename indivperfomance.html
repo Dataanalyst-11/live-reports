@@ -145,9 +145,8 @@
 const API_URL = "https://dashboard-proxy.mis-philmed01-dpt.workers.dev/pharma/";
 const AUTO_REFRESH_MS = 600000;
 const LOOKBACK_DAYS = 365;
-const MIN_TARGET = 100000; // hard floor on each telesale's calculated target (KES)
 
-let allRawData = [], branchPerfData = [], rows = [];
+let allRawData = [], rows = [];
 let isLoading = false, abortCtrl = null;
 
 /* ── Branches ─────────────────────────────────────────────── */
@@ -193,8 +192,8 @@ function num(v) {
   const n = Number(String(v).replace(/[,%]/g, "").trim());
   return Number.isFinite(n) ? n : 0;
 }
-const getTarget = r => num(r.dailySalesTarget ?? r.salesTarget ?? r.target ?? r.dailyTarget ?? r.targetSales);
-const getNet = r => num(r.netDailySales ?? r.netSales ?? r.dailyNetSales ?? r.branchNetSales);
+// Raw deficit straight from the API per telesale record
+const getDeficit = r => num(r.dailySalesDeficit ?? r.salesDeficit ?? r.dailyDeficit ?? r.deficit);
 const rowBranchId = r => r.orgBranchId || r.branchId || "";
 const rowBranchName = r => String(r.branchName || r.orgBranchName || branchNames[r.orgBranchId] || "").trim();
 const rowPerson = r => String(r.salesPersonName || r.salespersonName || r.salesPerson || r.name || "").trim();
@@ -252,54 +251,15 @@ function fetchRange() {
 }
 const unwrap = j => Array.isArray(j) ? j : (j.data || []);
 const fetchSales = signal => fetchWithRetry(`${API_URL}sales-person-performance?pageSize=10000&${fetchRange()}`, { signal }).then(unwrap);
-const fetchBranches = signal => fetchWithRetry(`${API_URL}branch-sales-performance-reports?${fetchRange()}&pageSize=10000`, { signal }).then(unwrap);
 
 /* ── Calculation ──────────────────────────────────────────── */
-/* Branch raw target for the selected period (sum of daily targets). */
-function branchRawTargets(startDate, endDate) {
-  const perDay = new Map(); // "branch||date" -> target
-  for (const r of branchPerfData) {
-    const d = recDate(r); if (!inRange(d, startDate, endDate)) continue;
-    const name = rowBranchName(r).toLowerCase(); if (!name) continue;
-    const k = `${name}||${d}`;
-    perDay.set(k, (perDay.get(k) || 0) + getTarget(r));
-  }
-  const seen = new Set();
-  for (const r of allRawData) { // fallback for branch-days missing from branch report
-    const d = recDate(r); if (!inRange(d, startDate, endDate)) continue;
-    const name = rowBranchName(r).toLowerCase(); if (!name) continue;
-    const k = `${name}||${d}`;
-    if (perDay.has(k) || seen.has(k)) continue;
-    seen.add(k); perDay.set(k, getTarget(r));
-  }
-  const out = new Map();
-  for (const [k, t] of perDay) { const b = k.split("||")[0]; out.set(b, (out.get(b) || 0) + t); }
-  return out;
-}
-
+/* Sum the raw dailySalesDeficit reported by the API for each telesale
+   (grouped by telesale + branch) over the selected date range. */
 function computeRows() {
   const { startDate, endDate } = getDateRange();
   const selected = branchSelect.value;
   const selectedName = (branchNames[selected] || "").toLowerCase();
 
-  // Static ratio source: full previous calendar month
-  const now = new Date();
-  const lmEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-  const lmStart = new Date(lmEnd.getFullYear(), lmEnd.getMonth(), 1);
-  const lmS = fmtDate(lmStart), lmE = fmtDate(lmEnd);
-
-  const lmBranch = new Map(), lmPerson = new Map();
-  for (const r of allRawData) {
-    if (!inRange(recDate(r), lmS, lmE)) continue;
-    const name = rowPerson(r), net = getNet(r);
-    if (!name || net <= 0) continue;
-    const b = rowBranchName(r).toLowerCase();
-    lmBranch.set(b, (lmBranch.get(b) || 0) + net);
-    const pk = `${name.toLowerCase()}||${b}`;
-    lmPerson.set(pk, (lmPerson.get(pk) || 0) + net);
-  }
-
-  // Active telesales in selected period
   const people = new Map();
   for (const r of allRawData) {
     if (!inRange(recDate(r), startDate, endDate)) continue;
@@ -308,27 +268,15 @@ function computeRows() {
       const match = (bId && bId === selected) || bName.toLowerCase() === selectedName;
       if (!match) continue;
     }
-    const name = rowPerson(r), net = getNet(r);
-    if (!name || net <= 0) continue;
+    const name = rowPerson(r);
+    if (!name) continue;
+
     const pk = `${name.toLowerCase()}||${bName.toLowerCase()}`;
-    if (!people.has(pk)) people.set(pk, { name, branch: bName, sales: 0 });
-    people.get(pk).sales += net;
+    if (!people.has(pk)) people.set(pk, { name, branch: bName, deficit: 0 });
+    people.get(pk).deficit += getDeficit(r);
   }
 
-  // Group by branch for ratio fallback
-  const activeCount = new Map();
-  for (const p of people.values()) { const b = p.branch.toLowerCase(); activeCount.set(b, (activeCount.get(b) || 0) + 1); }
-
-  const targets = branchRawTargets(startDate, endDate);
-  const result = [];
-  for (const [pk, p] of people) {
-    const b = p.branch.toLowerCase();
-    const hist = lmPerson.get(pk) || 0, histTotal = lmBranch.get(b) || 0;
-    const ratio = histTotal > 0 ? hist / histTotal : 1 / activeCount.get(b);
-    const target = Math.max(ratio * (targets.get(b) || 0), MIN_TARGET);
-    result.push({ name: p.name, branch: p.branch, deficit: target - p.sales });
-  }
-  return result;
+  return [...people.values()];
 }
 
 /* ── Render ───────────────────────────────────────────────── */
@@ -369,9 +317,9 @@ async function loadAllData() {
   const signal = abortCtrl.signal;
   setLoading(true);
   try {
-    const [sales, branches] = await Promise.all([fetchSales(signal), fetchBranches(signal)]);
+    const sales = await fetchSales(signal);
     if (signal.aborted) return;
-    allRawData = sales; branchPerfData = branches;
+    allRawData = sales;
     refresh();
     $("lastUpdated").textContent = new Date().toLocaleTimeString();
   } catch (err) {
