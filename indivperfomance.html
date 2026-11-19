@@ -194,6 +194,8 @@ function num(v) {
 }
 // Raw deficit straight from the API per telesale record
 const getDeficit = r => num(r.dailySalesDeficit ?? r.salesDeficit ?? r.dailyDeficit ?? r.deficit);
+// Net sales for the record (used to confirm the telesale actually sold)
+const getNet = r => num(r.netDailySales ?? r.netSales ?? r.dailyNetSales ?? r.branchNetSales);
 const rowBranchId = r => r.orgBranchId || r.branchId || "";
 const rowBranchName = r => String(r.branchName || r.orgBranchName || branchNames[r.orgBranchId] || "").trim();
 const rowPerson = r => String(r.salesPersonName || r.salespersonName || r.salesPerson || r.name || "").trim();
@@ -254,7 +256,8 @@ const fetchSales = signal => fetchWithRetry(`${API_URL}sales-person-performance?
 
 /* ── Calculation ──────────────────────────────────────────── */
 /* Sum the raw dailySalesDeficit reported by the API for each telesale
-   (grouped by telesale + branch) over the selected date range. */
+   (grouped by telesale + branch) over the selected date range.
+   Only telesales who actually recorded sales in the range are shown. */
 function computeRows() {
   const { startDate, endDate } = getDateRange();
   const selected = branchSelect.value;
@@ -272,11 +275,14 @@ function computeRows() {
     if (!name) continue;
 
     const pk = `${name.toLowerCase()}||${bName.toLowerCase()}`;
-    if (!people.has(pk)) people.set(pk, { name, branch: bName, deficit: 0 });
-    people.get(pk).deficit += getDeficit(r);
+    if (!people.has(pk)) people.set(pk, { name, branch: bName, deficit: 0, sales: 0 });
+    const entry = people.get(pk);
+    entry.deficit += getDeficit(r);
+    entry.sales += getNet(r);
   }
 
-  return [...people.values()];
+  // Drop salespeople with zero (or negative) sales in the selected range
+  return [...people.values()].filter(p => p.sales > 0);
 }
 
 /* ── Render ───────────────────────────────────────────────── */
